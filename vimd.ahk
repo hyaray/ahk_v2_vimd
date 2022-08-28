@@ -1,16 +1,12 @@
-﻿;<2021-09-08 21:06:05> hyaray
-;插件：
-;   以 VimD_Excel 为例(其下的子类不另细说)：
-;   VimD_Excel：往往作为应用库，继承于基础库 _Excel
-;   应将大部分功能放在基础库，涉及 vimd 的才放 VimD_Excel
-;   TODO VimD_Excel_Comment，应优先使用 Excel_Comment，涉及 count 等vimd特有的才放 VimD_Excel_Comment
-;   map 热键格式
-;       组合键：用<xxx>, xxx 格式同 hotkey，如 <<+a> 不推荐&格式热键(因为^+a会执行 LShift & a)，而不会执行<<+a>
-;       特殊键：{xxx} 如 {F1}
-;       普通键：大写直接用大写字母即可
-;NOTE 脚本出错后务必运行 vimd.errorDo() ，可结合 OnError
+﻿;说明：
+;内置两个模式 mode0(原生) 和 mode1(vimd功能)，名称定义在 arrModeName
+;默认按键 map 见 mapDefault
+;按 ` 从 mode1→mode0
+;按 escape 从 mode0→mode1(可能需要优先执行原生的escape功能,见 funCheckEscape)
 ;按键格式切换
-;   1. keyIn 里，keyMap := vimd.key_hot2map(ThisHotkey) 主要逻辑都用 keyMap 处理
+;   keyIn 里，keyMap := vimd.key_hot2map(ThisHotkey) 主要逻辑都用 keyMap 处理
+;插件配制：见 wins\Notepad\VimD_Notepad.ahk
+;NOTE 脚本出错后务必运行 vimd.errorDo()，取消注释末尾的 OnError
 
 class vimd {
     static arrModeName := ["None","Vim"]
@@ -175,7 +171,7 @@ class vimd {
             ;this.modeList := map()
             this.currentMode := ""
             this.hotwin := ""
-            this.objAllMap := map() ;记录所有拦截的按键(ThisHotkey)
+            this.objSingleKey := map() ;记录所有拦截的按键(ThisHotkey)
             ;其他属性
             this.count := 0
             this.isBreak := false ;无视count
@@ -403,7 +399,7 @@ class vimd {
         deal(keyMap) {
             if (keyMap == "{escape}") {
                 if (this.doListGroup.has(keyMap)) {
-                    this.callFunc(this.doListGroup[keyMap][1][2])
+                    this.callFunc(this.doListGroup[keyMap][1]["action"])
                 } else { ;mode0
                     send(keyMap) ;mode0模式下需要 TODO
                     this.init()
@@ -411,7 +407,7 @@ class vimd {
                 }
             } else if (keyMap == "{BackSpace}") {
                 if (this.doListGroup.has(keyMap)) {
-                    this.callFunc(this.doListGroup[keyMap][1][2])
+                    this.callFunc(this.doListGroup[keyMap][1]["action"])
                 } else {
                     send(keyMap) ;None模式下需要 TODO
                     this.init()
@@ -422,7 +418,7 @@ class vimd {
                     this.dealCount(keyMap)
                 } else if (keyMap == "." && this.win.currentMode.index == 1) { ;Repeat
                     ;msgbox(json.stringify(this.doListGroup[keyMap], 4))
-                    this.callFunc(this.doListGroup[keyMap][1][2])
+                    this.callFunc(this.doListGroup[keyMap][1]["action"])
                     this.init()
                 } else {
                     this.update(keyMap)
@@ -446,18 +442,6 @@ class vimd {
             this._show(string(this.win.count))
         }
 
-        ;on() {
-        ;    for keyName, keyObject in this.mapList {
-        ;        this.RegisterKey(keyObject, "on")
-        ;    }
-        ;}
-
-        ;off() {
-        ;    for keyName, keyObject in this.mapList {
-        ;        this.RegisterKey(keyObject, "off")
-        ;    }
-        ;}
-
         getStrCache() { ;arrKeyMap连接字符串
             str := ""
             for v in this.arrKeyMap
@@ -477,49 +461,45 @@ class vimd {
                     return
                 }
             }
-            arrAct := [] ;记录所有匹配热键
+            arrMatch := [] ;记录所有匹配热键
             ;匹配动态命令
             strCache := this.getStrCache()
             ;msgbox(this.doListDynamic.length)
-            for act in this.doListDynamic {
+            for objKey in this.doListDynamic {
                 ;OutputDebug(arc[1] . " -- " . strCache)
-                if (instr(act[1],strCache,true) == 1)
-                    arrAct.push(act)
+                if (instr(objKey["string"],strCache,true) == 1)
+                    arrMatch.push(objKey)
             }
             ;OutputDebug("after check doListDynamic")
             ;匹配普通命令
             if (this.doListGroup.has(this.arrKeyMap[1])) {
-                for act in this.doListGroup[this.arrKeyMap[1]] {
-                    if (instr(act[1],strCache,true) == 1) ;NOTE 匹配大小写
-                        arrAct.push(act)
+                for objKey in this.doListGroup[this.arrKeyMap[1]] {
+                    if (instr(objKey["string"],strCache,true) == 1) ;NOTE 匹配大小写
+                        arrMatch.push(objKey)
                 }
             }
-            ;OutputDebug(json.stringify(arrAct, 4))
-            if (!arrAct.length) { ;没找到命令
+            ;OutputDebug(json.stringify(arrMatch, 4))
+            if (!arrMatch.length) { ;没找到命令
                 if (this.arrKeyMap.length == 1) ;为第1个按键
                     send(this.arrKeyMap[1])
                 this.init()
-            } else if (arrAct.length == 1) { ;单个结果
-                ;msgbox(json.stringify(arrAct[1], 4))
-                this.do(arrAct[1])
+            } else if (arrMatch.length == 1) { ;单个结果
+                ;msgbox(json.stringify(arrMatch[1], 4))
+                this.do(arrMatch[1])
             } else { ;大部分情况
-                this.showTips(arrAct)
+                this.showTips(arrMatch)
             }
         }
 
         ;-----------------------------------maps-----------------------------------
 
         /*
-        keyObject := {}
-        keyObject.sequence := []
-        keyObject.error := []
-        keyObject.string := ""
-        keyObject.raw := keyString
-        keyObject.action := ""
-        keyObject.comment := ""
-        keyObject.noWait := noWait ;TODO
-        keyObject.noMulti := noMulti ;TODO
-        keyObject.super := super ;热键永远 on(无视模式)，直接用 hotkey()定义即可
+        objKey := {}
+        objKey.arrkey := []
+        objKey.string := "" ;按键字符串
+        objKey.action := ""
+        objKey.comment := ""
+        objKey.super := super ;热键永远 on(无视模式)，直接用 hotkey()定义即可
         */
         ;公共 map
         mapDefault(bCount:=true) {
@@ -530,9 +510,9 @@ class vimd {
                 this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"有count或arrKeyMap，则退出")
                 this.mapkey("{BackSpace}",ObjBindMethod(this,"doGlobal_BackSpace"),"BackSpace")
                 this.mapkey("\e",ObjBindMethod(this,"doGlobal_Edit"),"【编辑】VimD_" . this.win.name)
-                this.mapkey("\|",ObjBindMethod(this,"doGlobal_Debug_doListGroup"),"doGlobal_Debug_doListGroup")
-                this.mapkey("\_",ObjBindMethod(this,"doGlobal_Debug_objAllMap"),"doGlobal_Debug_objAllMap")
-                this.mapkey("\s",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"doGlobal_Debug_objKeySuperVim")
+                this.mapkey("\|",ObjBindMethod(this,"doGlobal_Debug_doListGroup"),"查看所有功能(按首键分组)doListGroup")
+                this.mapkey("\_",ObjBindMethod(this,"doGlobal_Debug_objAllMap"),"查看所有拦截的按键 objSingleKey")
+                this.mapkey("\s",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
                 if bCount
                     this.mapCount()
                 this.mapkey("." ,ObjBindMethod(this,"doGlobal_Repeat"),"重做")
@@ -541,49 +521,51 @@ class vimd {
 
         ;keysmap类型 <^enter> {F1} + A
         mapkey(keysmap, funcObj, comment) {
-            objKey := this._map(keysmap, funcObj)
+            objKey := this._map(keysmap, funcObj, comment)
             keyMapFirst := vimd.key_hot2map(objKey["arrkey"][1])
             ;添加到doListGroup(objTips用) NOTE keysmap要区分大小写，否则会被覆盖
             if (!this.doListGroup.has(keyMapFirst))
-                this.doListGroup[keyMapFirst] := [[objKey["string"], funcObj, comment]]
+                this.doListGroup[keyMapFirst] := [objKey]
             else
-                this.doListGroup[keyMapFirst].push([objKey["string"], funcObj, comment])
+                this.doListGroup[keyMapFirst].push(objKey)
         }
         mapDynamic(keysmap, funcObj, comment) {
-            objKey := this._map(keysmap, funcObj)
-            ;OutputDebug(objKey["string"])
-            this.doListDynamic.push([objKey["string"], funcObj,"***" . comment])
+            objKey := this._map(keysmap, funcObj, comment)
+            objKey["comment"] := "***" . objKey["comment"] ;动态功能，前面加 ***
+            this.doListDynamic.push(objKey)
         }
         mapCount() {
             loop(10)
                 this.mapkey(A_Index-1,ObjBindMethod(this.win,"keyIn"),"count")
         }
 
-        ;插件里定义的 keysmap 转成 map
-        ;keysmap类型 <^enter> {F1} + A
-        _map(keysmap, funcObj) {
+        ;把定义打包为 objKey
+        _map(keysmap, funcObj, comment) {
             objKey := this.key_map2arrHot(keysmap)
+            objKey["action"] := funcObj
+            objKey["comment"] := comment 
             ;OutputDebug(json.stringify(objKey, 4))
             for v in objKey["arrkey"] {
                 if (A_Index == 1) {
                     if (objKey["super"]) ;记录超级键
                         this.win.objKeySuperVim[vimd.key_hot2map(v)] := 1
                 }
-                if (!this.win.objAllMap.has(v)) {
+                if (!this.win.objSingleKey.has(v)) { ;单键避免重复定义
                     hotkey(v, ObjBindMethod(this.win,"keyIn")) ;NOTE 相关的键全部要拦截，用 vimd 控制
-                    this.win.objAllMap[v] := 1
+                    this.win.objSingleKey[v] := 1
                 }
             }
             return objKey
         }
 
         ;NOTE 和 vimd.key_hot2map() 相反，只用于转换用户定义的按键为 vimd 格式
+        ;keysmap类型 <^enter> {F1} + A
         ;插件里定义的 keyMap(尽量兼容hotkey) 转成 hotkey 命令识别的格式的数组
         ;返回 arr(比如 <^a>A{enter}，则返回["^a","+a","enter"])
         ;带修饰键(一般都直接执行)
         ;   <^f> --> ^f
         ;多字符
-        ;   {enter} --> enter
+        ;   {F1} --> F1
         ;单字符
         ;   空格 --> space
         ;   不处理
@@ -643,7 +625,7 @@ class vimd {
             ;timeSave := A_TickCount
             ;NOTE 运行
             loop(cnt) {
-                this.callFunc(doObj[2], true)
+                this.callFunc(doObj["action"], true)
                 if this.win.isBreak ;运行后才知道是否 isBreak
                     break
             }
@@ -713,26 +695,17 @@ class vimd {
             this.init()
         }
 
-        ;doGlobal_Debug_wins() {
-        ;    hyf_objView(this.win.getMode(1))
-        ;}
-        ;doGlobal_Debug_mode() {
-        ;    hyf_objView(this.win.modeList)
-        ;}
-        ;doGlobal_Debug() {
-        ;    hyf_objView(this.doSave, format("win.name:{1}`noWin.currentMode.name:{2}",this.win.name, this.win.currentMode.name))
-        ;}
         doGlobal_Debug_doListGroup() {
             res := ""
-            for k, arr in this.doListGroup {
-                for arr1 in arr
-                    res .= format("{1}: {2}`t{3}`n", k,arr1[1],arr1[3])
+            for k, arrKey in this.doListGroup {
+                for objKey in arrKey
+                    res .= format("{1}: {2}`t{3}`n", k,objKey["string"],objKey["comment"])
             }
             msgbox(res,,0x40000)
         }
         doGlobal_Debug_objAllMap() {
             res := ""
-            for k, arr in this.win.objAllMap
+            for k, arr in this.win.objSingleKey
                 res .= format("{1}`n", k)
             msgbox(res,,0x40000)
         }
@@ -750,7 +723,7 @@ class vimd {
             this.tipsDynamic .= "`t" . str
         }
 
-        showTips(arrAct) {
+        showTips(arrMatch) {
             strCache := this.getStrCache()
             ;sKey := (strCache ~= "^[A-Z]$") ? "S-" . strCache : strCache
             sKey := strCache
@@ -759,24 +732,15 @@ class vimd {
                 : strCache
             strTooltip .= this.tipsDynamic ;NOTE 添加动态信息
             strTooltip .= "`n=====================`n" 
-            for act in arrAct
-                strTooltip .= format("{1}`t{2}`n", act[1],act[3])
-                ;strTooltip .= RegExReplace(act[1],"\s|\{space\}","☐") . A_Tab . act[3] . "`n"
+            for objKey in arrMatch
+                strTooltip .= format("{1}`t{2}`n", objKey["string"],objKey["comment"])
+                ;strTooltip .= RegExReplace(objKey[1],"\s|\{space\}","☐") . A_Tab . objKey[3] . "`n"
             this._show(strTooltip)
         }
 
         hideTips() {
             tooltip(,,, vimd.tipLevel)
         }
-
-        ;ShowAll() {
-        ;    str := ""
-        ;    for k, act in this.
-        ;        str .= act[1] . A_Tab . act[3] . "`n"
-        ;    this._show(str)
-        ;    this.init(false)
-        ;    exit
-        ;}
 
         ;NOTE
         _show(str) {
@@ -808,6 +772,12 @@ class vimd {
 
 }
 
-#include d:\BB\lib\hyaray.ahk
+;OnError(errorDo)
+;errorDo(exception, mode) {
+;    msgbox(exception.file . "`n" . exception.line,,0x40000)
+;    vimd.errorDo() ;NOTE 否则 vimd 下个按键会无效
+;}
+
+#include hyaray.ahk
 #include vimdInclude.ahk
 

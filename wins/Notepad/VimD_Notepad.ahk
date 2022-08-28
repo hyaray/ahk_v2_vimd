@@ -15,6 +15,7 @@ class VimD_Notepad {
             "a", (p*)=>this.dynamicAuto(),
         )
     
+        this.win.initMode(0).funCheckEscape := ObjBindMethod(this,"beforeEscape")
         this.mode1 := this.win.initMode(1, true, ObjBindMethod(this,"beforeKey"))
     
         this.win.setKeySuperVim() ;按下此键后，临时强制下一按键执行 vimd 命令，默认设置为 {RControl} 键
@@ -38,6 +39,11 @@ class VimD_Notepad {
         ;this.win.setMode(0) ;是否默认 None 模式
     }
     
+    ;mode0→mode1，如果想优先执行原生功能，判断条件在此
+    static beforeEscape() {
+        return false
+    }
+
     ;NOTE 核心函数
     ;如果返回 true，则运行 vimd 命令
     ;否则，直接 send
