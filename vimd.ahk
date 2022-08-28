@@ -1,0 +1,1 @@
+d:/BB/plugins/vimd/vimd.ahk
