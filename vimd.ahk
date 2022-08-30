@@ -172,7 +172,9 @@ class vimd {
             ;this.modeList := map()
             this.currentMode := ""
             this.hotwin := ""
-            this.objSingleKey := map() ;以 this.hotwin 为key1，单键为key2, 记录所有拦截的按键(ThisHotkey)
+            ;一个 hotwin 下，用任意模式【定义一次hotkey】即可，能拦截到，后续由 keyIn 处理逻辑
+            ;以 this.hotwin 为key1，单键为key2, 记录所有已拦截的按键
+            this.objSingleKey := map()
             this.objSingleKey.CaseSense := true
             ;其他属性
             this.count := 0
@@ -261,7 +263,6 @@ class vimd {
             ;标记此键
             this.keySuperVim := keySuperVim
             ;vimd 拦截此键，功能为切换到 super mode1(不判断 onBeforeKey，结束用 typeSuperVim 来全局判断)
-            ;用任意模式定义一次按键即可，能拦截到，后续由 keyIn 处理逻辑
             this.currentMode.mapkey(keySuperVim ,ObjBindMethod(this,"changeMode",1),"super mode1")
         }
 
@@ -360,9 +361,9 @@ class vimd {
                 vimd.arrModeName[this.index+1] := modename
             this.name := this.win.name . "-" . vimd.arrModeName[this.index+1]
             ;this.funcDo := ""
-            this.doSave := ["nothing","first"] ;保存上个命令
+            this.objDoSave := {} ;保存上个 objDo
             this.objTips := map() ;NOTE 大纲提示(可动态在命令里用 this.mode1.objTips[key] 来添加)
-            this.objtips.CaseSense := true
+            this.objTips.CaseSense := true
             ;NOTE 用 array 可以记录顺序
             ;改进：根据第1个单按键分组
             this.objByFirstKey := map() ;以第1个 keyMap(因为keyIn转成了keyMap) 分类
@@ -406,14 +407,15 @@ class vimd {
         ;NOTE 被keyIn调用
         ;TODO count情况是否优先处理
         deal(keyMap) {
+            ;OutputDebug(A_ThisFunc)
             if (keyMap == "{escape}") {
                 if (this.objByFirstKey.has(keyMap)) {
+                    ;OutputDebug(format("this.objByFirstKey.has({1})", keyMap))
                     this.callFunc(this.objByFirstKey[keyMap][1]["action"])
                 } else { ;mode0
                     send(keyMap) ;mode0模式下需要 TODO
-                    this.init()
-                    return
                 }
+                this.init()
             } else if (keyMap == "{BackSpace}") {
                 if (this.objByFirstKey.has(keyMap)) {
                     this.callFunc(this.objByFirstKey[keyMap][1]["action"])
@@ -551,6 +553,7 @@ class vimd {
         }
 
         ;把定义打包为 objDo
+        ;objDo 保存则由各方法自行定义
         _map(keysmap, funcObj, comment) {
             objDo := this.key_map2arrHot(keysmap)
             objDo["action"] := funcObj
@@ -629,14 +632,14 @@ class vimd {
         }
 
         ;最终执行的命令
-        do(doObj) {
+        do(objDo) {
             this.hideTips()
-            ;msgbox(this.win.isRepeat . "`n" . json.stringify(doObj, 4))
+            ;msgbox(this.win.isRepeat . "`n" . json.stringify(objDo, 4))
             cnt := this.win.GetCount()
             ;timeSave := A_TickCount
             ;NOTE 运行
             loop(cnt) {
-                this.callFunc(doObj["action"], true)
+                this.callFunc(objDo["action"], true)
                 if this.win.isBreak ;运行后才知道是否 isBreak
                     break
             }
@@ -644,7 +647,7 @@ class vimd {
             ;SetTimer(tooltip.bind(,,, 9), -1000)
             ;处理 repeat 和 count
             if !this.win.isRepeat {
-                this.doSave := doObj
+                this.objDoSave := objDo
                 this.CountSave := cnt
             }
             ;if isobject(this.onAfterDo)
@@ -680,7 +683,7 @@ class vimd {
         }
         doGlobal_Repeat() {
             this.win.isRepeat := true
-            this.callFunc(this.doSave["action"], true)
+            this.callFunc(this.objDoSave["action"], true)
         }
         doGlobal_Up() {
             send("{up}")
@@ -767,9 +770,9 @@ class vimd {
 
         ;-----------------------------------tips__-----------------------------------
 
+        ;NOTE 这里不能取消 isBreak
         callFunc(funcObj, errExit:=false) {
             res := hyf_do(funcObj)
-            this.init()
             if !res {
                 if errExit
                     exit

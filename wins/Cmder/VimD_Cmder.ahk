@@ -12,7 +12,9 @@ ssh 工具推荐用 MobaXterm
 切换目录
 
 问题
-
+    进 git 仓库卡
+        s:\cmder\vendor\clink.lua
+        local git_dir = get_git_dir() 所在行左边加--
     因为在此系统上禁止运行脚本。有关详细信息，请参阅 https:/go.microsoft.com/fwlink/?LinkID=135170 中的 about_Execution_Policies。
         解决方法：运行 set-ExecutionPolicy RemoteSigned
 */
@@ -33,7 +35,7 @@ class VimD_Cmder {
 
         this.win.setKeySuperVim()
 
-        ;hotkey("F4", (p*)=>_ET.smartDo())
+        ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
 
         vimd.setWin("Cmder", "管理员: ahk_class VirtualConsoleClass")
@@ -84,6 +86,7 @@ class VimD_Cmder {
         this.mode1.mapkey("st",(p*)=>sendEx("git status","{enter}"), "git status")
         this.mode1.mapkey("ll",(p*)=>sendEx("git log", "{enter}"), "git log")
         this.mode1.mapkey("l1",(p*)=>sendEx("git log --oneline", "{enter}"), "git log --oneline")
+        this.mode1.mapkey("ls",(p*)=>sendEx("git ls-files", "{enter}"), "git ls-files")
         ;   diff
         this.mode1.mapkey("d1", (p*)=>sendEx("git diff"), "git diff")
         this.mode1.mapkey("d2", (p*)=>sendEx("git diff --cached"), "git diff --cached")
@@ -106,7 +109,8 @@ class VimD_Cmder {
         this.mode1.mapkey("cm",(p*)=>sendEx('git commit -amend ""',"{left}"), 'git commit -amend')
         this.mode1.mapkey("C",(p*)=>sendEx('git add .`n git commit -am ""',"{left}"), 'git add & commit -am')
         ;   rebase
-        this.mode1.mapkey("rb",(p*)=>sendEx("git rebase -i "), "git rebase -i")
+        this.mode1.mapkey("ri",(p*)=>sendEx("git rebase -i "), "git rebase -i")
+        this.mode1.mapkey("rh",(p*)=>sendEx(format("git rebase -i HEAD~{1}", VimD_Cmder.win.setRepeatDo(2))), "git rebase -i HEAD~n")
         ;   push
         this.mode1.mapkey("ps",(p*)=>sendEx("git push origin main"), "git push origin main")
         ;   pull
@@ -122,6 +126,13 @@ class VimD_Cmder {
         hyf_char("340909171C3B0B2526291E1E2E060D5720163D0B1F0A350A0400310427140F3F14595C1337072700")
         sleep(500)
         sendEx("@github.com/hyaray/ahk_v2_.git", "{left 4}")
+    }
+
+    static getCurrentTabName() {
+        elWin := UIA.ElementFromHandle(WinActive("A"), true)
+        elTab := elWin.GetLast().GetLast()
+        ;elTab.getTabItems()
+        return elTab.FindControl("TabItem", ComValue(0xB,-1), "SelectionItemIsSelected").CurrentName
     }
 
     static youget(){
@@ -172,14 +183,15 @@ class _Cmd {
     ;        return obj[arr[3]]
     ;}
 
+    ;task 不含{}
     static runSend(sCmd, dir:="", task:="") {
         if (dir == "")
             dir := A_Desktop
         sRun := format('s:\cmder\vendor\conemu-maximus5\ConEmu64.exe /single -dir "{1}"', dir)
+        if (task != "")
+            sRun .= format(" -run {{1}}", task)
         run(sRun)
         WinWaitActive("ahk_class VirtualConsoleClass")
-        if (task != "")
-            sendEx("{alt down}g{alt up}", 200)
         ;OutputDebug(sCmd)
         ;if WinExist("ahk_class Console_2_Main")
         ;    WinActivate
