@@ -7,7 +7,7 @@
 ;按 F2 定义为 <super>，所以任意时候按键都会执行 vimd 命令
 class VimD_Notepad {
 
-    static __new(p*) {
+    static __new() { ;NOTE 当脚本自动重启时自动运动
         if (this != VimD_Notepad)
             return
         this.win := vimd.setWin("Notepad", "ahk_exe notepad.exe")
@@ -15,14 +15,18 @@ class VimD_Notepad {
             "a", (p*)=>this.dynamicAuto(),
         )
     
+        ;funCheckEscape 为了解决 mode0 时按 escape 优先处理原生功能，还是切换到 mode1
+        ;返回 true 则发送按键 escape
+        ;如果无需定义 funCheckEscape，下行可省略
         this.win.initMode(0).funCheckEscape := ObjBindMethod(this,"beforeEscape")
+
         this.mode1 := this.win.initMode(1, true, ObjBindMethod(this,"beforeKey"))
     
         this.win.setKeySuperVim() ;按下此键后，临时强制下一按键执行 vimd 命令，默认设置为 {RControl} 键
     
         hotkey("F1", (p*)=>PostMessage(0x111, 2, 0, , "ahk_class Notepad"))
     
-        vimd.setWin("Notepad", "ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
+        ;vimd.setWin("Notepad", "ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
 
         ;带 <super> 后的第1个按键，则在任意时间都执行 vimd 命令
         ;所以一般不用可输入的按键，否则此键就废了
@@ -39,7 +43,8 @@ class VimD_Notepad {
         ;this.win.setMode(0) ;是否默认 None 模式
     }
     
-    ;mode0→mode1，如果想优先执行原生功能，判断条件在此
+    ;mode0 时按 escape
+    ;返回 true 则发送 escape 键，否则切换到 mode1
     static beforeEscape() {
         return false
     }

@@ -32,8 +32,7 @@ sendEx(arr*) {
             continue ;不改变 md
         } else {
             if !isset(md) ;第一次需判断是否按键
-                md := (StrLower(v) ~= "^{\w+( (down|up))?}") ;NOTE
-                ;md := (StrLower(v) ~= "^{[lr]?(tab|enter|ctrl|alt|shift|win)( (down|up))?}") ;NOTE
+                md := (StrLower(v) ~= "^{\w+(?: (?:down|up|\d+))?}") ;NOTE 如果要发送 {\w+} 格式字符串，则不要用此函数
             if (md)
                 send(v)
             else
@@ -43,30 +42,10 @@ sendEx(arr*) {
     }
 }
 
-isfunc(funName){
-    try
-        return (type(%funName%) == "Func")
-    catch
-        return false
-}
-
-;hyf_objHasAndCall(obj, var, key:="") {
-;    if (type(var) == "Map") {
-;        if obj.has(var[key])
-;            return obj[var[key]](var) ;NOTE 传入var为参数？
-;        else
-;            return 0
-;    } else {
-;        if obj.has(var)
-;            return obj[var](var) ;NOTE 传入var为参数？
-;        else
-;            return 0
-;    }
-;}
-
 ;NOTE 可直接获取的不依赖复制
 ;bVimNormal 获取 Vim normal模式下的内容
 hyf_getSelect(bVimNormal:=false, bInput:=false) {
+    OutputDebug(A_ThisFunc)
     if WinActive("ahk_class XLMAIN") {
         if (ControlGetClassNN(ControlGetFocus()) == "EXCEL71")
             return rng2str(ox().selection)
@@ -104,10 +83,12 @@ hyf_getSelect(bVimNormal:=false, bInput:=false) {
             }
         }
     }
+    OutputDebug("copy")
     ;其他情况复制
     clipSave := A_Clipboard
     A_Clipboard := ""
-    send("{20}{ctrl down}c{ctrl up}")
+    sleep(10)
+    send("{ctrl down}c{ctrl up}")
     if ClipWait(0.2) {
         if 0
             res := trim(A_Clipboard) ;TODO 可能会耗时较长
@@ -116,6 +97,7 @@ hyf_getSelect(bVimNormal:=false, bInput:=false) {
         A_Clipboard := clipSave
         return res
     } else {
+        OutputDebug("no clip")
         A_Clipboard := clipSave
         if (bInput) {
             res := inputbox("获取和复制失败，请手工输入内容")
@@ -321,9 +303,8 @@ hyf_findFile(dirIn, arrNoExt, ext:="") {
         return res
     if !isobject(arrNoExt)
         arrNoExt := [arrNoExt]
-    l := arrNoExt.length
-    loop(l) {
-        fp := findPath(arrNoExt[l-A_Index+1]) ;NOTE 从后向前遍历
+    loop(arrNoExt.length) {
+        fp := findPath(arrNoExt[-A_Index]) ;NOTE 从后向前遍历
         if (fp != "")
             return fp
     }
@@ -767,10 +748,8 @@ hyf_isPing(ip, ms:=200) {
     ipCreate(str, _ip:="192.168.1.1") {
         arr := StrSplit(str, ".")
         arrBase := StrSplit(_ip, ".")
-        nBase := arrBase.length
-        n := arr.length
         loop(arr.length)
-            arrBase[nBase-A_Index+1] := arr[n-A_Index+1]
+            arrBase[-A_Index] := arr[-A_Index]
         res := ""
         for v in arrBase
             res .= v . "."
