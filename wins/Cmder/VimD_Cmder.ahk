@@ -24,7 +24,7 @@ class VimD_Cmder {
     static __new() {
         if (this != VimD_Cmder)
             return
-        this.win := vimd.setWin("Cmder", "ahk_class VirtualConsoleClass") ;Console.exe cmd.exe
+        this.win := vimd.initWin("Cmder", "ahk_class VirtualConsoleClass") ;Console.exe cmd.exe
         this.win.cls := this
 
         this.mode1 := this.win.initMode(1, true, (p*)=>1)
@@ -38,16 +38,21 @@ class VimD_Cmder {
         ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
 
-        vimd.setWin("Cmder", "管理员: ahk_class VirtualConsoleClass")
+        this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass")
 
+        ;cd
         this.mode1.mapkey("cdd", (p*)=>sendEx("d:\ee"), "cd d:")
+
+        ;查看
+        this.mode1.mapkey("trd", (p*)=>sendEx("tree .`n"), "tree .")
+        this.mode1.mapkey("trf", (p*)=>sendEx("tree /f .`n"), "tree /f .")
 
         ;ping
         this.mode1.mapkey("pp", (p*)=>sendEx(format("ping 192.168.{1}.", VimD_Cmder.win.setRepeatDo(1))), "ping 192.168.16.")
-        this.mode1.mapkey("p1", (p*)=>sendEx(format("ping {1} -t", RegExReplace(_Cmd.ipPart(),"\d+$","1")), "{enter}"), "ping 网关")
+        this.mode1.mapkey("p1", (p*)=>sendEx(format("ping {1} -t`n", RegExReplace(_Cmd.ipPart(),"\d+$","1"))), "ping 网关")
         this.mode1.mapkey("p2",(p*)=>sendEx(format("ping {1} -t", _Cmd.ipPart(2))), "ping ip2")
         this.mode1.mapkey("p3",(p*)=>sendEx(format("ping {1} -t", _Cmd.ipPart(3))), "ping ip3")
-        this.mode1.mapkey("pt", (p*)=>sendEx("ping taobao.com -t","{enter}"), "ping taobao")
+        this.mode1.mapkey("pt", (p*)=>sendEx("ping taobao.com -t`n"), "ping taobao")
 
         ;telnet
         this.mode1.mapkey("t2",(p*)=>sendEx("telnet " . _Cmd.ipPart(2)), "telnet ip2")
@@ -63,8 +68,8 @@ class VimD_Cmder {
         this.mode1.mapkey("uad", (p*)=>_Cmd.netuserAdd(),"net user /add")
         this.mode1.mapkey("umo", (p*)=>_Cmd.netuserModify(), "net user /modify")
 
-        this.mode1.mapkey("npmi", (p*)=>sendEx("npm install --modules-folder d:\TC\soft\node "), "npm install")
-        this.mode1.mapkey("mac", (p*)=>sendEx("getmac /NH"), "getmac")
+        ;this.mode1.mapkey("npmi", (p*)=>sendEx("npm install --modules-folder d:\TC\soft\node "), "npm install")
+        ;this.mode1.mapkey("mac", (p*)=>sendEx("getmac /NH"), "getmac")
         this.mode1.mapkey("ipa", (p*)=>sendEx("ipconfig /all"), "ipconfig /all")
         this.mode1.mapkey("ipc", (p*)=>sendEx("ipconfig"), "ipconfig")
         ;this.mode1.mapkey("das", (p*)=>sendEx("django-admin startproject"), "django-admin")
@@ -73,27 +78,28 @@ class VimD_Cmder {
         ;["ub", "fix Bug", (p*)=>_Cmd.fixBug()], ;解决排版问题
         ;["vhd", "create vdisk file=d:\hy\ww.vhdx maximum=4096 type=expandable"],
 
-        vimd.setWin("Cmder", "MINGW ahk_class VirtualConsoleClass")
+        this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", ["ahk_class VirtualConsoleClass", "管理员: ahk_class VirtualConsoleClass"])
         this.mode1.mapkey("cd", (p*)=>sendEx("cd /d/ee"), "cd d:")
         ;git
         this.mode1.mapkey("gu",(p*)=>sendEx('git config --global user.name "hyaray"'), "git config --global user.name")
         this.mode1.mapkey("ge",(p*)=>sendEx('git config --global user.email "hyaray@vip.qq.com"'), "git  config --global user.email")
         this.mode1.mapkey("gl",(p*)=>sendEx("git config --global core.autocrlf false"), "git config --global 关闭自动转换换行符")
         this.mode1.mapkey("ra",(p*)=>sendEx("git remote add origin https://github.com/hyaray/ahk_v2_.git", "{left 4}"), "git remote add")
-        this.mode1.mapkey("rs",(p*)=>sendEx("git remote show origin", "{enter}"), "git remote show")
+        this.mode1.mapkey("rs",(p*)=>sendEx("git remote show origin`n"), "git remote show")
         this.mode1.mapkey("rt",(p*)=>VimD_Cmder.gitSecurt(), "git remote add token")
         ;   status
-        this.mode1.mapkey("st",(p*)=>sendEx("git status","{enter}"), "git status")
-        this.mode1.mapkey("ll",(p*)=>sendEx("git log", "{enter}"), "git log")
-        this.mode1.mapkey("l1",(p*)=>sendEx("git log --oneline", "{enter}"), "git log --oneline")
-        this.mode1.mapkey("ls",(p*)=>sendEx("git ls-files", "{enter}"), "git ls-files")
+        this.mode1.mapkey("st",(p*)=>sendEx("git status`n"), "git status")
+        this.mode1.mapkey("lg",(p*)=>sendEx("git log`n"), "git log")
+        this.mode1.mapkey("l1",(p*)=>sendEx("git log --oneline`n"), "git log --oneline")
+        this.mode1.mapkey("ls",(p*)=>sendEx("git ls-files"), "git ls-files")
+        this.mode1.mapkey("lv",(p*)=>sendEx("git ls-files -v"), "git ls-files -v")
         ;   diff
         this.mode1.mapkey("d1", (p*)=>sendEx("git diff"), "git diff")
         this.mode1.mapkey("d2", (p*)=>sendEx("git diff --cached"), "git diff --cached")
         this.mode1.mapkey("d3", (p*)=>sendEx("git diff HEAD"), "git diff HEAD")
         ;   add
         this.mode1.mapkey("aa",(p*)=>sendEx("git add "), "git  add")
-        this.mode1.mapkey("a.",(p*)=>sendEx("git add .", "{enter}"), "git  add .")
+        this.mode1.mapkey("a.",(p*)=>sendEx("git add .`n"), "git  add .")
         ;   branch
         this.mode1.mapkey("sc",(p*)=>sendEx("git switch -c "), "git switch -c")
         this.mode1.mapkey("bd",(p*)=>sendEx("git branch -d "), "git branch -d")

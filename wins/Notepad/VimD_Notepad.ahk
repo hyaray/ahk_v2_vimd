@@ -10,8 +10,8 @@ class VimD_Notepad {
     static __new() { ;NOTE 当脚本自动重启时自动运动
         if (this != VimD_Notepad)
             return
-        this.win := vimd.setWin("Notepad", "ahk_exe notepad.exe")
-        this.win.objDynamic := map(
+        this.win := vimd.initWin("Notepad", "ahk_exe notepad.exe")
+        this.win.objFunDynamic := map(
             "a", (p*)=>this.dynamicAuto(),
         )
     
@@ -25,8 +25,7 @@ class VimD_Notepad {
         this.win.setKeySuperVim() ;按下此键后，临时强制下一按键执行 vimd 命令，默认设置为 {RControl} 键
     
         hotkey("F1", (p*)=>PostMessage(0x111, 2, 0, , "ahk_class Notepad"))
-    
-        ;vimd.setWin("Notepad", "ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
+        ;this.mode1.setHotIf("ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
 
         ;带 <super> 后的第1个按键，则在任意时间都执行 vimd 命令
         ;所以一般不用可输入的按键，否则此键就废了
