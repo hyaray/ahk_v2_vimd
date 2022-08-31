@@ -38,7 +38,19 @@ class VimD_Cmder {
         ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
 
-        ;this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass")
+        this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
+
+        ;this.mode2.setObjHotWin("管理员: ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
+
+        ;this.mode2.mapkey("rz1", (p*)=>sendEx("rz1"), "rz1")
+        ;this.mode2.mapkey("rz2", (p*)=>sendEx("rz2"), "rz2")
+        ;this.mode2.mapkey("rz3", (p*)=>sendEx("rz3"), "rz3")
+        ;this.mode2.mapkey("rz4", (p*)=>sendEx("rz4"), "rz4")
+        ;this.mode2.mapkey("rz5", (p*)=>sendEx("rz5"), "rz5")
+        ;this.mode2.mapkey("rz6", (p*)=>sendEx("rz6"), "rz6")
+        ;this.mode2.mapkey("rz7", (p*)=>sendEx("rz7"), "rz7")
+        ;this.mode2.mapkey("rz8", (p*)=>sendEx("rz8"), "rz8")
+        ;this.mode2.mapkey("rz9", (p*)=>sendEx("rz9"), "rz9")
 
         ;cd
         this.mode1.mapkey("cdd", (p*)=>sendEx("d:\ee"), "cd d:")
@@ -78,7 +90,7 @@ class VimD_Cmder {
         ;["ub", "fix Bug", (p*)=>_Cmd.fixBug()], ;解决排版问题
         ;["vhd", "create vdisk file=d:\hy\ww.vhdx maximum=4096 type=expandable"],
 
-        ;this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", ["ahk_class VirtualConsoleClass", "管理员: ahk_class VirtualConsoleClass"])
+        this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
         this.mode1.mapkey("cd", (p*)=>sendEx("cd /d/ee"), "cd d:")
         ;git
         this.mode1.mapkey("gu",(p*)=>sendEx('git config --global user.name "hyaray"'), "git config --global user.name")

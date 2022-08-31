@@ -25,7 +25,7 @@ class VimD_Notepad {
         this.win.setKeySuperVim() ;按下此键后，临时强制下一按键执行 vimd 命令，默认设置为 {RControl} 键
     
         hotkey("F1", (p*)=>PostMessage(0x111, 2, 0, , "ahk_class Notepad"))
-        ;this.mode1.setHotIf("ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
+        ;this.mode1.setObjHotWin("ahk_class Notepad") ;设置此行，则后续定义的按键只在对应窗口生效
 
         ;带 <super> 后的第1个按键，则在任意时间都执行 vimd 命令
         ;所以一般不用可输入的按键，否则此键就废了
