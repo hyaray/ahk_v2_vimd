@@ -38,7 +38,7 @@ class VimD_Cmder {
         ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
 
-        this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass")
+        ;this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass")
 
         ;cd
         this.mode1.mapkey("cdd", (p*)=>sendEx("d:\ee"), "cd d:")
@@ -78,7 +78,7 @@ class VimD_Cmder {
         ;["ub", "fix Bug", (p*)=>_Cmd.fixBug()], ;解决排版问题
         ;["vhd", "create vdisk file=d:\hy\ww.vhdx maximum=4096 type=expandable"],
 
-        this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", ["ahk_class VirtualConsoleClass", "管理员: ahk_class VirtualConsoleClass"])
+        ;this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", ["ahk_class VirtualConsoleClass", "管理员: ahk_class VirtualConsoleClass"])
         this.mode1.mapkey("cd", (p*)=>sendEx("cd /d/ee"), "cd d:")
         ;git
         this.mode1.mapkey("gu",(p*)=>sendEx('git config --global user.name "hyaray"'), "git config --global user.name")
