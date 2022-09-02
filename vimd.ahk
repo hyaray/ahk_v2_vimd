@@ -556,10 +556,11 @@ class vimd {
             ;非常规功能
             if this.objKeysmap.has(keyMap) { ;单键功能
                 OutputDebug(format("this.objKeysmap.has({1}) do={2}", keyMap,this.objKeysmap[keyMap]["comment"]))
-                if (keyMap ~= "^\d$")
+                if (keyMap ~= "^\d$") {
                     this.dealCount(integer(keyMap))
-                else
+                } else {
                     this.do(this.objKeysmap[keyMap])
+                }
                 exit
             } else {
                 OutputDebug(format("this.objKeysmap.not has({1})", keyMap))
@@ -574,7 +575,6 @@ class vimd {
             ;        this.dealCount(keyMap)
             ;    } else if (keyMap == "." && this.index == 1) { ;Repeat
             ;        this.do(this.objHotIfWin_FirstKey[this.win.currentHotIfWin][keyMap][1])
-            ;        this.init()
             ;    } else {
             ;        OutputDebug(format("{1} do update", A_ThisFunc))
             ;        this.update(keyMap)
@@ -586,7 +586,7 @@ class vimd {
 
         dealCount(keyMap) {
             if (keyMap == "{BackSpace}") {
-                if (this.win.count > 9) {
+                if (this.win.count > 9) { ;两位数
                     this.win.count := this.win.count//10
                 } else {
                     this.init()
@@ -646,7 +646,6 @@ class vimd {
             } else if (arrMatch.length == 1) { ;单个结果
                 ;msgbox(json.stringify(arrMatch[1], 4))
                 this.do(arrMatch[1])
-                this.init() ;NOTE 初始化
             } else { ;大部分情况
                 this.showTips(arrMatch)
             }
@@ -802,6 +801,7 @@ class vimd {
         ;}
 
         ;最终执行的命令
+        ;NOTE 自动 init()
         do(objDo) {
             this.hideTips()
             ;msgbox(this.win.isRepeat . "`n" . json.stringify(objDo, 4))
@@ -822,6 +822,7 @@ class vimd {
             }
             ;if isobject(this.onAfterDo)
             ;    this.callFunc(this.onAfterDo)
+            this.init()
         }
 
         ;NOTE 这里不能初始化 isBreak
