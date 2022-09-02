@@ -27,7 +27,8 @@ class VimD_Cmder {
         this.win := vimd.initWin("Cmder", "ahk_class VirtualConsoleClass") ;Console.exe cmd.exe
         this.win.cls := this
 
-        this.mode1 := this.win.initMode(1, true, (p*)=>1)
+        this.win.initMode(0).funCheckEscape := ObjBindMethod(this,"beforeEscape")
+        this.mode1 := this.win.initMode(1, true, (p*)=>ObjBindMethod(this,"beforeKey"))
         this.mode1.objTips.set(
             "g", "git",
             "p", "ping",
@@ -37,20 +38,9 @@ class VimD_Cmder {
 
         ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
+        hotkey("<^u", (p*)=>_Cmd.clearLine())
 
         this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
-
-        ;this.mode2.setObjHotWin("管理员: ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
-
-        ;this.mode2.mapkey("rz1", (p*)=>sendEx("rz1"), "rz1")
-        ;this.mode2.mapkey("rz2", (p*)=>sendEx("rz2"), "rz2")
-        ;this.mode2.mapkey("rz3", (p*)=>sendEx("rz3"), "rz3")
-        ;this.mode2.mapkey("rz4", (p*)=>sendEx("rz4"), "rz4")
-        ;this.mode2.mapkey("rz5", (p*)=>sendEx("rz5"), "rz5")
-        ;this.mode2.mapkey("rz6", (p*)=>sendEx("rz6"), "rz6")
-        ;this.mode2.mapkey("rz7", (p*)=>sendEx("rz7"), "rz7")
-        ;this.mode2.mapkey("rz8", (p*)=>sendEx("rz8"), "rz8")
-        ;this.mode2.mapkey("rz9", (p*)=>sendEx("rz9"), "rz9")
 
         ;cd
         this.mode1.mapkey("cdd", (p*)=>sendEx("d:\ee"), "cd d:")
@@ -94,11 +84,15 @@ class VimD_Cmder {
         this.mode1.mapkey("cd", (p*)=>sendEx("cd /d/ee"), "cd d:")
         ;git
         this.mode1.mapkey("gu",(p*)=>sendEx('git config --global user.name "hyaray"'), "git config --global user.name")
-        this.mode1.mapkey("ge",(p*)=>sendEx('git config --global user.email "hyaray@vip.qq.com"'), "git  config --global user.email")
+        this.mode1.mapkey("ge",(p*)=>sendEx('git config --global user.email "hyaray@vip.qq.com"'), "git config --global user.email")
+        this.mode1.mapkey("gb",(p*)=>sendEx("git config --global init.defaultBranch main"), "config --global 修改默认分支")
         this.mode1.mapkey("gl",(p*)=>sendEx("git config --global core.autocrlf false"), "git config --global 关闭自动转换换行符")
         this.mode1.mapkey("ra",(p*)=>sendEx("git remote add origin https://github.com/hyaray/ahk_v2_.git", "{left 4}"), "git remote add")
         this.mode1.mapkey("rs",(p*)=>sendEx("git remote show origin`n"), "git remote show")
         this.mode1.mapkey("rt",(p*)=>VimD_Cmder.gitSecurt(), "git remote add token")
+        ;   ignore
+        this.mode1.mapkey("if",(p*)=>sendEx("git rm --cache "), "忽略已提交的文件")
+        this.mode1.mapkey("id",(p*)=>sendEx("git rm -r --cache "), "忽略已提交的文件夹")
         ;   status
         this.mode1.mapkey("st",(p*)=>sendEx("git status`n"), "git status")
         this.mode1.mapkey("lg",(p*)=>sendEx("git log`n"), "git log")
@@ -106,13 +100,14 @@ class VimD_Cmder {
         this.mode1.mapkey("ls",(p*)=>sendEx("git ls-files"), "git ls-files")
         this.mode1.mapkey("lv",(p*)=>sendEx("git ls-files -v"), "git ls-files -v")
         ;   diff
-        this.mode1.mapkey("d1", (p*)=>sendEx("git diff"), "git diff")
-        this.mode1.mapkey("d2", (p*)=>sendEx("git diff --cached"), "git diff --cached")
-        this.mode1.mapkey("d3", (p*)=>sendEx("git diff HEAD"), "git diff HEAD")
+        this.mode1.mapkey("d1", (p*)=>sendEx("git diff"), "git diff工作区和暂存区")
+        this.mode1.mapkey("d2", (p*)=>sendEx("git diff --cached"), "git diff --cached暂存区和本地仓库")
+        this.mode1.mapkey("d3", (p*)=>sendEx("git diff HEAD"), "git diff HEAD工作区和本地仓库")
         ;   add
         this.mode1.mapkey("aa",(p*)=>sendEx("git add "), "git  add")
         this.mode1.mapkey("a.",(p*)=>sendEx("git add .`n"), "git  add .")
         ;   branch
+        this.mode1.mapkey("bb",(p*)=>sendEx("git branch`n"), "branch-查看")
         this.mode1.mapkey("sc",(p*)=>sendEx("git switch -c "), "git switch -c")
         this.mode1.mapkey("bd",(p*)=>sendEx("git branch -d "), "git branch -d")
         this.mode1.mapkey("bD",(p*)=>sendEx("git branch -D "), "git branch -D")
@@ -124,19 +119,31 @@ class VimD_Cmder {
         this.mode1.mapkey("mm",(p*)=>sendEx("git merge "), "git merge")
         ;   commit
         this.mode1.mapkey("cc",(p*)=>sendEx('git commit -am ""',"{left}"), 'git commit -am')
-        this.mode1.mapkey("cm",(p*)=>sendEx('git commit -amend ""',"{left}"), 'git commit -amend')
+        this.mode1.mapkey("cm",(p*)=>sendEx('git commit -amend ""',"{left}"), 'git commit -amend修改变更字符串')
         this.mode1.mapkey("C",(p*)=>sendEx('git add .`n git commit -am ""',"{left}"), 'git add & commit -am')
         ;   rebase
         this.mode1.mapkey("ri",(p*)=>sendEx("git rebase -i "), "git rebase -i")
-        this.mode1.mapkey("rh",(p*)=>sendEx(format("git rebase -i HEAD~{1}", VimD_Cmder.win.setRepeatDo(2))), "git rebase -i HEAD~n")
+        this.mode1.mapkey("rn",(p*)=>sendEx(format("git rebase -i HEAD~{1}", VimD_Cmder.win.setRepeatDo(2))), "git rebase合并最近N个提交")
         ;   push
-        this.mode1.mapkey("ps",(p*)=>sendEx("git push origin main"), "git push origin main")
+        this.mode1.mapkey("pu",(p*)=>sendEx("git push -u origin main"), "git push -u xxx以后可直接用git push")
+        this.mode1.mapkey("pp",(p*)=>sendEx("git push origin main"), "git push origin main")
+        this.mode1.mapkey("pf",(p*)=>sendEx("git push -f origin main"), "git push -f origin main强制")
         ;   pull
         this.mode1.mapkey("pl",(p*)=>sendEx("git pull origin main"), "git pull origin main")
         ;   restore
         this.mode1.mapkey("rs",(p*)=>sendEx("git restore"), "git restore")
 
         this.win.setMode(0)
+    }
+
+    static beforeKey() {
+        name := this.getCurrentTabName(true)
+        return (name != "vim.exe")
+    }
+
+    static beforeEscape(p*) {
+        name := this.getCurrentTabName(true)
+        return (name == "vim.exe")
     }
 
     static gitSecurt() {
@@ -146,11 +153,12 @@ class VimD_Cmder {
         sendEx("@github.com/hyaray/ahk_v2_.git", "{left 4}")
     }
 
-    static getCurrentTabName() {
+    static getCurrentTabName(bTrim:=false) {
         elWin := UIA.ElementFromHandle(WinActive("A"), true)
         elTab := elWin.GetLast().GetLast()
         ;elTab.getTabItems()
-        return elTab.FindControl("TabItem", ComValue(0xB,-1), "SelectionItemIsSelected").CurrentName
+        name := elTab.FindControl("TabItem", ComValue(0xB,-1), "SelectionItemIsSelected").CurrentName
+        return bTrim ? trim(name) : name
     }
 
     static youget(){
@@ -166,6 +174,14 @@ class VimD_Cmder {
 }
 
 class _Cmd {
+
+    static clearLine() {
+        title := WinGetTitle("A")
+        if (instr(title, "管理员") == 1)
+            send("{escape}")
+        else
+            send("{ctrl down}u{ctrl up}")
+    }
 
     ;static fixBug() { ;ConsoleZ
     ;    RegWrite(0x000003a8, "REG_DWORD", "HKEY_CURRENT_USER\Console\ConsoleZ command window", "CodePage")
@@ -202,23 +218,19 @@ class _Cmd {
     ;}
 
     ;task 不含{}
-    static runSend(sCmd, dir:="", task:="") {
+    static runSend(dir:="", var:="") {
         if (dir == "")
             dir := A_Desktop
         sRun := format('s:\cmder\vendor\conemu-maximus5\ConEmu64.exe /single -dir "{1}"', dir)
-        if (task != "")
-            sRun .= format(" -run {{1}}", task)
+        if (var ~= "^\{.*\}$")
+            sRun .= format(" -run {1}", var)
         run(sRun)
-        WinWaitActive("ahk_class VirtualConsoleClass")
-        ;OutputDebug(sCmd)
-        ;if WinExist("ahk_class Console_2_Main")
-        ;    WinActivate
-        ;else
-        ;    run(format('{1}\tool\ConsoleZ\Console.exe -d "{2}"', _TC.dir, dir))
-        ;WinWaitActive("ahk_class Console_2_Main")
-        while(!CaretGetPos())
-            sleep(100)
-        SendText(sCmd)
+        if (var ~= "^[^{]") {
+            WinWaitActive("ahk_class VirtualConsoleClass")
+            while(!CaretGetPos())
+                sleep(100)
+            SendText(var)
+        }
     }
 
     static ipPart(n:=4) {
