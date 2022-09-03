@@ -36,11 +36,13 @@ class VimD_Cmder {
 
         this.win.setKeySuperVim()
 
-        ;hotkey("F4", (p*)=>msgbox(VimD_Cmder.getCurrentTabName()))
+        hotkey("F4", (p*)=>_Cmd.smartDo())
         hotkey("F12", (p*)=>send("{alt down}{LWin down}p{LWin up}{alt up}"))
         hotkey("<^u", (p*)=>_Cmd.clearLine())
 
         this.mode1.setObjHotWin("管理员: ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
+
+        ;-----------------------------------cmd-----------------------------------
 
         ;cd
         this.mode1.mapkey("cdd", (p*)=>sendEx("d:\ee"), "cd d:")
@@ -75,20 +77,36 @@ class VimD_Cmder {
         this.mode1.mapkey("ipa", (p*)=>sendEx("ipconfig /all"), "ipconfig /all")
         this.mode1.mapkey("ipc", (p*)=>sendEx("ipconfig"), "ipconfig")
         ;this.mode1.mapkey("das", (p*)=>sendEx("django-admin startproject"), "django-admin")
-        ;this.mode1.mapkey("smp", (p*)=>sendEx("ssh pi@317600.xyz",500,"{enter}",1000,"shishi",200,"{enter}"), "树莓派")
         this.mode1.mapkey("up", (p*)=>_Cmd.sendP("net user administrator *"), "net user password delete")
         ;["ub", "fix Bug", (p*)=>_Cmd.fixBug()], ;解决排版问题
         ;["vhd", "create vdisk file=d:\hy\ww.vhdx maximum=4096 type=expandable"],
 
-        this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
         this.mode1.mapkey("cd", (p*)=>sendEx("cd /d/ee"), "cd d:")
-        ;git
+
+        ;ssh(在cmd下完成登录)
+        ;this.mode1.mapkey("smp", (p*)=>sendEx("ssh pi@317600.xyz",500,"{enter}",1000,"shishi",200,"{enter}"), "树莓派")
+        this.mode1.mapkey("sk", (p*)=>sendEx('ssh-keygen -t rsa -b4096 -C "hyaray"'), "ssh-keygen")
+        this.mode1.mapkey("shk", (p*)=>sendEx("ssh root@192.168.16.217 -p 55555`n"), "ssh hik")
+        this.mode1.mapkey("shw", (p*)=>sendEx("ssh admin@192.168.100.1`n"), "ssh huawei")
+
+        ;-----------------------------------ssh-----------------------------------
+        this.mode1.setObjHotWin("OpenSSH ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
+
+        this.mode1.mapkey("dd", (p*)=>sendEx('date'), "date查看系统时间")
+        this.mode1.mapkey("hc3", (p*)=>_SSH.setHwclock(), "ssh设置【硬件时间】=当前时间")
+        this.mode1.mapkey("hcr", (p*)=>sendEx("hwclock -r"), "hwclock -r查看【硬件时间】")
+        this.mode1.mapkey("hcw", (p*)=>sendEx("hwclock -w"), "hwclock -w系统时间写入【硬件时间】")
+        this.mode1.mapkey("hcs", (p*)=>sendEx("hwclock -s"), "hwclock -s【硬件时间】写入系统时间")
+
+        ;-----------------------------------git-----------------------------------
+        this.mode1.setObjHotWin("MINGW ahk_class VirtualConsoleClass", false, ["ahk_class VirtualConsoleClass"])
+
         this.mode1.mapkey("gu",(p*)=>sendEx('git config --global user.name "hyaray"'), "git config --global user.name")
         this.mode1.mapkey("ge",(p*)=>sendEx('git config --global user.email "hyaray@vip.qq.com"'), "git config --global user.email")
         this.mode1.mapkey("gb",(p*)=>sendEx("git config --global init.defaultBranch main"), "config --global 修改默认分支")
         this.mode1.mapkey("gl",(p*)=>sendEx("git config --global core.autocrlf false"), "git config --global 关闭自动转换换行符")
-        this.mode1.mapkey("ra",(p*)=>sendEx("git remote add origin https://github.com/hyaray/ahk_v2_.git", "{left 4}"), "git remote add")
-        this.mode1.mapkey("rs",(p*)=>sendEx("git remote show origin`n"), "git remote show")
+        this.mode1.mapkey("ra",(p*)=>sendEx("git remote add origin https://github.com/hyaray/ahk_v2_.git", "{left 4}"), "git remote add url")
+        this.mode1.mapkey("ru",(p*)=>sendEx("git remote show origin`n"), "git remote show")
         this.mode1.mapkey("rt",(p*)=>VimD_Cmder.gitSecurt(), "git remote add token")
         ;   ignore
         this.mode1.mapkey("if",(p*)=>sendEx("git rm --cache "), "忽略已提交的文件")
@@ -97,7 +115,11 @@ class VimD_Cmder {
         this.mode1.mapkey("st",(p*)=>sendEx("git status`n"), "git status")
         this.mode1.mapkey("lg",(p*)=>sendEx("git log`n"), "git log")
         this.mode1.mapkey("l1",(p*)=>sendEx("git log --oneline`n"), "git log --oneline")
-        this.mode1.mapkey("ls",(p*)=>sendEx("git ls-files"), "git ls-files")
+        this.mode1.mapkey("ll",(p*)=>sendEx("git ls-files"), "git ls-files查看暂存区文件")
+        this.mode1.mapkey("lm",(p*)=>sendEx("git ls-files -m"), "git ls-files查看暂存区修改的文件")
+        this.mode1.mapkey("ld",(p*)=>sendEx("git ls-files -d"), "git ls-files查看暂存区删除的文件")
+        this.mode1.mapkey("lo",(p*)=>sendEx("git ls-files -o"), "git ls-files查看暂存区未被跟踪的文件")
+        this.mode1.mapkey("li",(p*)=>sendEx("git ls-files -s"), "git ls-files查看暂存区文件编号")
         this.mode1.mapkey("lv",(p*)=>sendEx("git ls-files -v"), "git ls-files -v")
         ;   diff
         this.mode1.mapkey("d1", (p*)=>sendEx("git diff"), "git diff工作区和暂存区")
@@ -137,12 +159,12 @@ class VimD_Cmder {
     }
 
     static beforeKey() {
-        name := this.getCurrentTabName(true)
+        name := this.getCurrentTabName()
         return (name != "vim.exe")
     }
 
-    static beforeEscape(p*) {
-        name := this.getCurrentTabName(true)
+    static beforeEscape() {
+        name := this.getCurrentTabName()
         return (name == "vim.exe")
     }
 
@@ -153,27 +175,40 @@ class VimD_Cmder {
         sendEx("@github.com/hyaray/ahk_v2_.git", "{left 4}")
     }
 
-    static getCurrentTabName(bTrim:=false) {
+    ;要求设置→标签栏→控制台为%n
+    static getCurrentTabName() {
         elWin := UIA.ElementFromHandle(WinActive("A"), true)
-        elTab := elWin.GetLast().GetLast()
-        ;elTab.getTabItems()
+        elLast := elWin.GetLast() ;是否显示标题栏，对此有影响
+        while (elLast.CurrentControlType != UIA.ControlType.Pane)
+            elLast := elLast.GetPrev()
+        elTab := elLast.GetLast()
         name := elTab.FindControl("TabItem", ComValue(0xB,-1), "SelectionItemIsSelected").CurrentName
-        return bTrim ? trim(name) : name
+        return name
     }
 
     static youget(){
-        WinActive("A")
-        ctl := (ControlGetFocus() || WinGetID())
         url := _CB.getUrl()
         str := "you-get -o c:\Users\Administrator\Desktop " . url
-        loop parse, str
-            PostMessage(0x102, ord(A_LoopField),, ctl)
-        return
+        SendText(str)
     }
 
 }
 
 class _Cmd {
+
+    static smartDo() {
+        title := WinGetTitle("A")
+        if (instr(title, "MINGW") == 1) {
+            arr := [
+                ["V", "vimd", "d:\BB\plugins\vimd"],
+                ["L", "lib", "d:\BB\lib"],
+            ]
+            arrRes := _Tooltip.asMenu(arr)
+            if (!arrRes.length)
+                return
+            _Cmd.runSend(arrRes[3], "{bash::git}")
+        }
+    }
 
     static clearLine() {
         title := WinGetTitle("A")
@@ -250,9 +285,17 @@ class _Cmd {
         SendText(str)
         if (key != "")
             send(key)
-        ;WinActive("A")
-        ;ctl := (ControlGetFocus() || WinGetID())
-        ;loop parse, str
-        ;    PostMessage(WM_CHAR:=0x102, ord(A_LoopField),, ctl)
     }
+}
+
+class _SSH extends _Cmd {
+
+    static setHwclock() {
+        sendEx(format('date -s "{1}"', FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")))
+        tooltip("确认后按enter继续")
+        KeyWait("enter", "D")
+        tooltip
+        sendEx(100, "date`n", 100, "hwclock -w`n")
+    }
+
 }
