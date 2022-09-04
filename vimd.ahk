@@ -121,7 +121,7 @@ class vimd {
     ;   +a --> A
     ;   ^a --> <^a> 一般都直接执行
     ;多字符
-    ;   space --> {space}
+    ;   space --> A_Space 不用{space}
     ;   enter --> {enter}
     ;   escape --> {escape}
     ;单字符
@@ -138,8 +138,10 @@ class vimd {
         ;        ? StrUpper(substr(ThisHotkey,-1))
         ;        : format("<{1}>", ThisHotkey)
         } else if (strlen(keyMap) > 1) {
-            keyMap := format("{{1}}", keyMap)
-            ;keyMap := (ThisHotkey=="space") ? A_Space : format("{{1}}", ThisHotkey)
+            if (1) ;更符合用户查看方式
+                keyMap := (ThisHotkey=="space") ? A_Space : format("{{1}}", ThisHotkey)
+            else
+                keyMap := format("{{1}}", keyMap)
         } else { ;长度=1
             if GetKeyState("CapsLock", "T") { ;大小写转换
                 if (keyMap ~= "^[a-z]$")
@@ -156,7 +158,7 @@ class vimd {
         if (keyMap ~= "^<.+>")
             keyMap := substr(keyMap, 2, strlen(keyMap)-2)
         else if (strlen(keyMap) == 1) ;支持大小写
-            keyMap := format("{{1}}", keyMap)
+            keyMap := (keyMap==" " ? "{space}" : format("{{1}}", keyMap))
         return keyMap
     }
 
@@ -307,7 +309,6 @@ class vimd {
                 this.arrMode[idx] := this.currentMode
             ;NOTE 在这里直接定义 initWin 时设置的 currentHotIfWin
             this.currentMode.objHotIfWin_FirstKey[this.currentHotIfWin] := map()
-            ;this.currentMode.objHotIfWin_FirstKeyDynamic[this.currentHotIfWin] := map()
             this.currentMode.mapDefault(bCount)
             if funOnBeforeKey
                 this.currentMode.onBeforeKey := isobject(funOnBeforeKey) ? funOnBeforeKey : ObjBindMethod(this.currentMode,"beforeKey")
@@ -326,7 +327,7 @@ class vimd {
 
         getArrWinMatch(winTitle, pushself:=false) {
             ;OutputDebug("-----------------------------------arrTitle-----------------------------------")
-            OutputDebug(format("d#{1} {2}:{3} winTitle={4}", A_LineFile,A_LineNumber,A_ThisFunc,winTitle))
+            ;OutputDebug(format("d#{1} {2}:{3} winTitle={4}", A_LineFile,A_LineNumber,A_ThisFunc,winTitle))
             hwnd := WinExist(winTitle)
             if (hwnd == 0)
                 throw TargetError(winTitle)
@@ -433,14 +434,13 @@ class vimd {
         keyIn(ThisHotkey) {
             objThisKey := map()
             keyMap := vimd.key_hot2map(ThisHotkey)
-            ;OutputDebug("-----------------------------------{1}start-----------------------------------")
+            ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------start", A_LineFile,A_LineNumber,A_ThisFunc))
             ;OutputDebug(format("currentMode.index={1}", this.currentMode.index))
-            ;OutputDebug(format("keyMap={1}", keyMap))
             ;OutputDebug(format("arrKeymapPressed.length = {1}", this.currentMode.arrKeymapPressed.length))
+            ;OutputDebug(format("keyMap={1}", keyMap))
             ;OutputDebug(format("typeSuperVim = {1}", this.typeSuperVim ))
-            ;OutputDebug(format("this.currentMode.index={1}", this.currentMode.index))
             ;OutputDebug(format("objKeySuperVim={1}", json.stringify(this.objKeySuperVim)))
-            ;OutputDebug("-----------------------------------end-----------------------------------")
+            ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------end", A_LineFile,A_LineNumber,A_ThisFunc))
             ;NOTE 记录当前的窗口，用来出错后 init
             vimd.winCurrent := this
             bChecked := false
@@ -486,10 +486,9 @@ class vimd {
             ;key2 = keyMapFirst, value = objDo
             this.objKeysmap := map() ;{keysmap, objDo}
             this.objKeysmap.CaseSense := true
-            ;this.objHotIfWin_FirstKeyDynamic := map()
-            ;this.objHotIfWin_FirstKeyDynamic.CaseSense := true
             this.objHotIfWin_FirstKey := map()
             this.objHotIfWin_FirstKey.CaseSense := true
+            this.thisHotIfWin := "" ;以第一个键判断当前匹配窗口(解决窗口乱匹配，导致热键识别问题)
             ;NOTE 用 array 可以记录顺序
             this.arrListDynamic := [] ;动态命令
             ;event(部分事件在 vimdWins 部分事件在 vimdModes)
@@ -531,7 +530,6 @@ class vimd {
         ;NOTE 设置关联，适合复杂逻辑，否则用 setHotIf 即可
         setObjHotWin(winTitle, bAsHotIfWin:=true, arrWinTitle:=unset) {
             this.win.setHotIf(winTitle, bAsHotIfWin)
-            ;this.objHotIfWin_FirstKeyDynamic[this.win.currentHotIfWin] := map()
             this.objHotIfWin_FirstKey[this.win.currentHotIfWin] := map()
             if isset(arrWinTitle)
                 this.objHotIfWins[winTitle] := arrWinTitle is array ? arrWinTitle : [arrWinTitle]
@@ -544,6 +542,8 @@ class vimd {
                 this.update(keyMap)
                 return
             }
+            ;NOTE 以第一个键判断当前匹配窗口
+            this.thisHotIfWin := vimd.getHotIfWin() ;TODO 是否准确
             ;4. 判断 onBeforeKey
             if (this.win.typeSuperVim==0 && isobject(this.onBeforeKey)) { ;NOTE typeSuperVim 则不执行 onBeforeKey
                 if (this.onBeforeKey.call(keyMap) == 0) { ;返回 false，则相当于 None 模式
@@ -555,7 +555,7 @@ class vimd {
             ;自动运行 objFunDynamic()
             if (this.HasOwnProp("objFunDynamic") && this.objFunDynamic.has(keyMap)) {
                 ;OutputDebug(format("i#{1} {2}:{3}.objFunDynamic({4})", A_LineFile,A_LineNumber,this.name,keyMap))
-                this.arrListDynamic := []
+                this.arrListDynamic := [] ;NOTE 每次都要清空
                 this.objFunDynamic[keyMap].call()
                 ;OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
             }
@@ -576,18 +576,64 @@ class vimd {
                     this.update(keyMap)
                 }
             }
-            ;if (this.arrKeymapPressed.length == 0) { ;第一个按键
-            ;    if (keyMap ~= "^\d$" && this.objHotIfWin_FirstKey[this.win.currentHotIfWin].has(keyMap)) { ;防止None模式
-            ;        this.dealCount(keyMap)
-            ;    } else if (keyMap == "." && this.index == 1) { ;Repeat
-            ;        this.do(this.objHotIfWin_FirstKey[this.win.currentHotIfWin][keyMap][1])
-            ;    } else {
-            ;        ;OutputDebug(format("{1} do update", A_ThisFunc))
-            ;        this.update(keyMap)
-            ;    }
-            ;} else {
-            ;    this.update(keyMap)
-            ;}
+        }
+
+        ;更新当前匹配的命令并 showTips
+        ;先修改arrKeymapPressed再运行
+        update(keyMap) {
+            ;OutputDebug(format("{1} keyMap={2}", A_ThisFunc,keyMap))
+            if (keyMap == "{BackSpace}") {
+                this.arrKeymapPressed.pop()
+                ;OutputDebug(format("new arrKeymapPressed = {1}", json.stringify(this.arrKeymapPressed)))
+                if (!this.arrKeymapPressed.length) {
+                    this.init()
+                    return
+                }
+            } else {
+                this.arrKeymapPressed.push(keyMap)
+            }
+            arrMatch := [] ;记录所有匹配热键(不分动态和普通)
+            strCache := this.getStrCache()
+            ;OutputDebug(format("i#{1} {2}:strCache={3}", A_LineFile,A_LineNumber,strCache))
+            ;匹配动态命令
+            if (keyMap == "\")
+                this.addTipsDynamic(this.name)
+            ;   命令列表是在第1个键动态生成，后续按键需要动态更新
+            for objDo in this.arrListDynamic {
+                if (instr(objDo["string"],strCache,true) == 1)
+                    arrMatch.push(objDo)
+            }
+            ;OutputDebug(format("i#{1} {2}:after check doListDynamic, arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
+            ;匹配普通命令
+            arrTitle := this.win.getArrWinMatch(this.thisHotIfWin, true) ;NOTE NOTE NOTE 获取当前热键可能匹配的 arrTitle
+            for winTitle in arrTitle  {
+                arrThis := addByWinTitle(winTitle)
+                ;OutputDebug(format("i#{1} {2}:winTitle={3} arrThis={4}", A_LineFile,A_LineNumber,winTitle,json.stringify(arrThis, 4)))
+            }
+            ;OutputDebug(format("i#{1} {2}:last arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
+            if (!arrMatch.length) { ;没找到命令
+                if (this.arrKeymapPressed.length == 1) ;为第1个按键
+                    send(this.arrKeymapPressed[1])
+                this.init()
+            } else if (arrMatch.length == 1) { ;单个结果
+                ;msgbox(json.stringify(arrMatch[1], 4))
+                this.do(arrMatch[1])
+            } else { ;大部分情况
+                this.showTips(arrMatch)
+            }
+            addByWinTitle(winTitle) {
+                arrThis := []
+                if (this.objHotIfWin_FirstKey[winTitle].has(this.arrKeymapPressed[1])) {
+                    for objDo in this.objHotIfWin_FirstKey[winTitle][this.arrKeymapPressed[1]] {
+                        ;OutputDebug(format('i#{1} {2}:objDo["string"]={3}', A_LineFile,A_LineNumber,objDo["string"]))
+                        if (instr(objDo["string"],strCache,true) == 1) { ;NOTE 匹配大小写
+                            arrMatch.push(objDo)
+                            arrThis.push(objDo["string"])
+                        }
+                    }
+                }
+                return arrThis
+            }
         }
 
         dealCount(keyMap) {
@@ -609,64 +655,6 @@ class vimd {
             for v in this.arrKeymapPressed
                 str .= v
             return str
-        }
-
-        ;更新当前匹配的命令并 showTips
-        ;先修改arrKeymapPressed再运行
-        update(keyMap) {
-            ;OutputDebug(format("{1} keyMap={2}", A_ThisFunc,keyMap))
-            if (keyMap == "{BackSpace}") {
-                this.arrKeymapPressed.pop()
-                ;OutputDebug(format("new arrKeymapPressed = {1}", json.stringify(this.arrKeymapPressed)))
-                if (!this.arrKeymapPressed.length) {
-                    this.init()
-                    return
-                }
-            } else {
-                this.arrKeymapPressed.push(keyMap)
-            }
-            arrMatch := [] ;记录所有匹配热键
-            ;匹配动态命令
-            strCache := this.getStrCache()
-            ;msgbox(this.arrListDynamic.length)
-            if (keyMap == "\")
-                this.addTipsDynamic(this.name)
-            for objDo in this.arrListDynamic {
-                if (instr(objDo["string"],strCache,true) == 1)
-                    arrMatch.push(objDo)
-            }
-            OutputDebug(format("i#{1} {2}:after check doListDynamic, arrMatch.length=", A_LineFile,A_LineNumber,arrMatch.length))
-            ;匹配普通命令
-            ;NOTE NOTE NOTE 获取当前热键可能匹配的 arrTitle
-            arrTitle := this.win.getArrWinMatch(vimd.getHotIfWin(), true)
-            for winTitle in arrTitle  {
-                arrThis := addByWinTitle(winTitle)
-                ;OutputDebug(format("---------------{1} ---------------", winTitle))
-                ;OutputDebug(json.stringify(arrThis, 4))
-            }
-            OutputDebug(format("i#{1} {2}:last arrMatch.length=", A_LineFile,A_LineNumber,arrMatch.length))
-            if (!arrMatch.length) { ;没找到命令
-                if (this.arrKeymapPressed.length == 1) ;为第1个按键
-                    send(this.arrKeymapPressed[1])
-                this.init()
-            } else if (arrMatch.length == 1) { ;单个结果
-                ;msgbox(json.stringify(arrMatch[1], 4))
-                this.do(arrMatch[1])
-            } else { ;大部分情况
-                this.showTips(arrMatch)
-            }
-            addByWinTitle(winTitle) {
-                arrThis := []
-                if (this.objHotIfWin_FirstKey[winTitle].has(this.arrKeymapPressed[1])) {
-                    for objDo in this.objHotIfWin_FirstKey[winTitle][this.arrKeymapPressed[1]] {
-                        if (instr(objDo["string"],strCache,true) == 1) { ;NOTE 匹配大小写
-                            arrMatch.push(objDo)
-                            arrThis.push(objDo["string"])
-                        }
-                    }
-                }
-                return arrThis
-            }
         }
 
         ;-----------------------------------maps-----------------------------------
@@ -716,18 +704,11 @@ class vimd {
             this.objKeysmap[keysmap] := objDo
         }
         mapDynamic(keysmap, funcObj, comment) {
-            objDo := this._map(keysmap, funcObj, comment)
-            objDo["comment"] := "***" . objDo["comment"] ;动态功能，前面加 ***
-            keyMapFirst := vimd.key_hot2map(objDo["arrkey"][1])
-            ;if (!this.objHotIfWin_FirstKeyDynamic[this.win.currentHotIfWin].has(keyMapFirst))
-            ;    this.objHotIfWin_FirstKeyDynamic[this.win.currentHotIfWin][keyMapFirst] := [objDo]
-            ;else
-            ;    this.objHotIfWin_FirstKeyDynamic[this.win.currentHotIfWin][keyMapFirst].push(objDo)
+            objDo := this._map(keysmap, funcObj, "***" . comment) ;动态功能，前面加 ***
             this.arrListDynamic.push(objDo)
-            ;this.objKeysmap[keysmap] := objDo
+            this.objKeysmap[keysmap] := objDo
         }
         ;把定义打包为 objDo
-        ;objDo 保存则由各方法自行定义
         _map(keysmap, funcObj, comment) {
             objDo := this.key_map2arrHot(keysmap)
             objDo["action"] := funcObj
@@ -979,7 +960,6 @@ class vimd {
                     }
                 }
             } else {
-                ;msgbox(json.stringify(this.objHotIfWin_FirstKey[oInput.value], 4))
                 for winTitle, objKey in this.objHotIfWin_FirstKey {
                     if objKey.has(oInput.value) {
                         for objDo in objKey[oInput.value]
