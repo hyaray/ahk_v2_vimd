@@ -494,7 +494,7 @@ class vimd {
             this.arrListDynamic := [] ;动态命令
             ;event(部分事件在 vimdWins 部分事件在 vimdModes)
             ;NOTE 智能判断按键(智能模式识别的核心)返回 false 则直接发送按键
-            ;TODO 如果是第2个键，是否还要判断？
+            ;NOTE 如果是第2个键则不进行判断
             this.onBeforeKey := ""
             this.onAfterKey := ""
             this.onBeforeDo := ""
@@ -702,7 +702,6 @@ class vimd {
         mapCount() {
             loop(10)
                 this.mapkey(string(A_Index-1),ObjBindMethod(this,"dealCount"),format("<{1}>", A_Index-1)) ;TODO keyIn
-                ;this.mapkey(string(A_Index-1),ObjBindMethod(this.win,"keyIn"),"count") ;TODO keyIn
         }
 
         ;keysmap类型 <^enter> {F1} + A
@@ -963,11 +962,10 @@ class vimd {
             send("{right}")
         }
         doGlobal_objKeysmap() {
-            msgbox(this.name . "`n" . this.index)
+            ;msgbox(this.name . "`n" . this.index)
             res := ""
-            for keymap, objDo in this.objKeysmap {
+            for keymap, objDo in this.objKeysmap
                 res .= format("{1}`t{2}`t{3}`t{4}`n", keymap,objDo["hotwin"],objDo["string"],objDo["comment"])
-            }
             msgbox(res,,0x40000)
         }
         doGlobal_objByFirstKey() {
