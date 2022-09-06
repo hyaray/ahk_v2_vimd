@@ -1,4 +1,35 @@
 # VimDesktop by AutoHotkey v2-beta
-ideas come from [linxinhong/VimDesktop: 通过Autohotkey来VIM化桌面上大部分程序](https://gitee.com/linxinhong/VimDesktop)
+最初思路来源于 [linxinhong/VimDesktop: 通过Autohotkey来VIM化桌面上大部分程序](https://gitee.com/linxinhong/VimDesktop)
 
-Please use [thqby/AutoHotkey_H](https://github.com/thqby/AutoHotkey_H) to avoid some problems.
+AutoHotkey v2-beta 请使用 [thqby/AutoHotkey_H](https://github.com/thqby/AutoHotkey_H) 以避免某些问题。
+
+## 简介
+
+1. 完全自定义软件功能热键，并把命令做了分类（字母区分大小写就有`52`个分类，还支持各种键盘符号，所以分类会更多），以`Excel`打比方
+    1. 对`值`的处理，则用`v`前缀的功能，比如`v12`会自动在选中区域按顺序生成`1-n`的值，`vab`则生成`A-Z`的值
+    2. 对`批注`的处理，则用`c`前缀的功能，比如`ce`就是编辑当前批注，`c.`添加当前单元格内容到批注
+2. 基本上是按单键的组合方式，按下第一个键后，与它相关的热键会全部显示出来，减少了记热键的麻烦，并简化了过程（大部分功能按两个键即可）。
+    为什么大部分软件的热键都是带修饰键呢？是因为单键一般用来打字输入的。那`vimd`用单键，不会出问题吗？见[[#智能]]
+3. 支持对数字的处理：按命令前，智能判断`数字按键`，比如我按`100`，`vimd`会记住这个数字到`count`，后面在执行命令的时候，代码里可以指定`count`如何使用（比如我可以用此方法快速跳转到第`100`行，或者此命令执行`count`次）
+
+## 思路
+
+1. 各软件都会分成两个模式
+    1. `mode0`相当于原生功能，除了会定义`escape`键来切换到`mode1`，这里需要优先处理原生的按键功能（比如当前在编辑Excel单元格，按键是想退出编辑，如果再次按键，才是切换模式）
+    2. `mode1`是vimd的核心模式，核心在于[[#智能]]
+2. 各软件以`exeName`区分制作插件。如果子窗口需要单独定义，则需要多次定义`setWin`，再分别定义热键，多个单按键组合，则每个按键都会由`vimd`拦截调度（比如`va`和`vb`都定义了功能，则按`v`,`a`,`b`都会被拦截，为了效率，一个按键定义一次即可，只要能拦截按键，逻辑都在vimd里处理），由于可能定义的功能太多，所以记录按键功能的对象，会以`this.hotwin`为`key1`，再以第一个按键作为`key2`进行二次分组。每个`objDo`都会记录
+
+3. 超级按键：
+    1. 按下`keySuperVim`后，会临时切换到`mode1`（同时会记录当前模式到`modeBeforeSuper`，并标记`typeSuperVim=1`），执行一次命令或取消后会切换回`modeBeforeSuper`。
+    2. 按下另一类超级键如`{F5}`，会强制生效会临时切换到`mode1`，与上面方案的差异就是这种方式执行了两个动作，缺点是这个键在其他方面就完全失效了，全由vimd接管
+
+##### 智能
+通过一个核心的判断函数，在每个按键按下时判断当前是否是`可输入状态`，如果是则输入，否则就执行命令，非常`智能`。
+
+## 其他场景
+比如在微信里，我用`mode1`模式，
+但是大部分光标在`输入状态`，vimd会智能识别到并直接send，而不是执行vim命令，这是它智能的地方，
+当这时我想执行vimd命令，有三种方式：
+1. 鼠标点击不能打字区域，不要为`输入状态`，按vimd按键执行
+2. 按RControl临时转为强制vim模式（模式没增加，但是逻辑上不作输入状态判断了），再按vimd按键执行
+3. 直接把vimd功能设置为<super>模式，第1个按键则不判断输入状态，实现此功能

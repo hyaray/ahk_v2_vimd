@@ -1035,5 +1035,6 @@ class vimd {
 ;    vimd.errorDo() ;NOTE 否则 vimd 下个按键会无效
 ;}
 
+#include *i lin\hyaray.ahk
 #include vimdInclude.ahk
 

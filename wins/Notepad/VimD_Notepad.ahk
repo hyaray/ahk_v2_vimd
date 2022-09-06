@@ -29,6 +29,7 @@ class VimD_Notepad {
 
         ;带 <super> 后的第1个按键，则在任意时间都执行 vimd 命令
         ;所以一般不用可输入的按键，否则此键就废了
+        this.mode1.mapkey("<super>=",(p*)=>_Notepad.about(),"about")
         this.mode1.mapkey("<super>{F2}a",(p*)=>_Notepad.about(),"about")
         this.mode1.mapkey("<super>{F2}b",(p*)=>VimD_Notepad.ab(),"ab")
         this.mode1.mapkey("<super>{F2}w",(p*)=>_Notepad.wrap(),"自动换行")
