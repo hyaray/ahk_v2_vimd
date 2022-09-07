@@ -328,7 +328,7 @@ class _ET {
             if (n == 1)
                 return fps[1]
             else
-                return _Tooltip.asMenu(fps)[2]
+                return hyf_tooltipAsMenu(fps)[2]
         } else if !(filename ~= "\\|\/") { ;不包含/或\，则继续从PATH里寻找
             p := RegRead("HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\control\Session Manager\Environment", "PATH")
             loop parse, p, "`;" {
