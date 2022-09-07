@@ -11,9 +11,6 @@ class VimD_Notepad {
         if (this != VimD_Notepad)
             return
         this.win := vimd.initWin("Notepad", "ahk_exe notepad.exe")
-        this.win.objFunDynamic := map(
-            "a", (p*)=>this.dynamicAuto(),
-        )
     
         ;funCheckEscape 为了解决 mode0 时按 escape 优先处理原生功能，还是切换到 mode1
         ;返回 true 则发送按键 escape
@@ -21,6 +18,9 @@ class VimD_Notepad {
         this.win.initMode(0).funCheckEscape := ObjBindMethod(this,"beforeEscape")
 
         this.mode1 := this.win.initMode(1, true, ObjBindMethod(this,"beforeKey"))
+        this.mode1.objFunDynamic.set( ;定义动态热键
+            "a", (p*)=>VimD_Notepad.dynamicAuto(),
+        )
     
         this.win.setKeySuperVim() ;按下此键后，临时强制下一按键执行 vimd 命令，默认设置为 {RControl} 键
     
@@ -30,10 +30,10 @@ class VimD_Notepad {
         ;带 <super> 后的第1个按键，则在任意时间都执行 vimd 命令
         ;所以一般不用可输入的按键，否则此键就废了
         this.mode1.mapkey("<super>=",(p*)=>_Notepad.about(),"about")
-        this.mode1.mapkey("<super>{F2}a",(p*)=>_Notepad.about(),"about")
-        this.mode1.mapkey("<super>{F2}b",(p*)=>VimD_Notepad.ab(),"ab")
-        this.mode1.mapkey("<super>{F2}w",(p*)=>_Notepad.wrap(),"自动换行")
-        this.mode1.mapkey("<super>{F2}f",(p*)=>_Notepad.dialogFont(),"对话框-字体")
+        this.mode1.mapkey("<super>{F12}a",(p*)=>_Notepad.about(),"about")
+        this.mode1.mapkey("<super>{F12}b",(p*)=>VimD_Notepad.ab(),"ab")
+        this.mode1.mapkey("<super>{F12}w",(p*)=>_Notepad.wrap(),"自动换行")
+        this.mode1.mapkey("<super>{F12}f",(p*)=>_Notepad.dialogFont(),"对话框-字体")
 
         ;\为可输入按键，所以当在输入状态时会自动识别并输入
         this.mode1.mapkey("\1",(p*)=>msgbox(1),"msgbox 1")
@@ -47,6 +47,16 @@ class VimD_Notepad {
     ;返回 true 则发送 escape 键，否则切换到 mode1
     static beforeEscape() {
         return false
+    }
+
+    static dynamicAuto() {
+        if (ControlGetText("Edit1", "A") == "") {
+            this.mode1.mapDynamic("a1",(p*)=>msgbox("空1"),"空1")
+            this.mode1.mapDynamic("a2",(p*)=>msgbox("空2"),"空2")
+        } else {
+            this.mode1.mapDynamic("a1",(p*)=>msgbox("非空1"),"非空1")
+            this.mode1.mapDynamic("a2",(p*)=>msgbox("非空2"),"非空2")
+        }
     }
 
     ;NOTE 核心函数

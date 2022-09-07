@@ -558,6 +558,8 @@ class vimd {
                 this.arrListDynamic := [] ;NOTE 每次都要清空
                 this.objFunDynamic[keyMap].call()
                 ;OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
+            } else {
+                ;OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
             }
             ;非常规功能
             if this.objKeysmap.has(keyMap) { ;单键功能
@@ -1035,6 +1037,5 @@ class vimd {
 ;    vimd.errorDo() ;NOTE 否则 vimd 下个按键会无效
 ;}
 
-#include *i lin\hyaray.ahk
 #include vimdInclude.ahk
 
