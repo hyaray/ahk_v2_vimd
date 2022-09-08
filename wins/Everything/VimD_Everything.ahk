@@ -164,7 +164,7 @@ class VimD_Everything extends _ET {
 class _ET {
 
     static spath := "d:\TC\soft\Everything\Everything.exe"
-    static dll := format("d:\BB\lib\Everything{1}.dll", A_PtrSize*8)
+    static dll := format("d:\BB\plugins\vimd\wins\Everything\Everything{1}.dll", A_PtrSize*8)
     static exclude:= "!c:\windows\ !c:\windows.old\ !c:\Users\ !\$RECYCLE.BIN\ !\.SynologyWorkingDirectory !\_FreeFileSync_\ !d:\hy\" ;!\_gsdata_\
     ;static res := map()
 
