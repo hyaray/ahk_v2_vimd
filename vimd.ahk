@@ -264,6 +264,8 @@ class vimd {
             this.name := name
             this.arrMode := [] ;默认2个模式
             this.arrHotIfWin := [] ;记录所有 currentHotIfWin
+            ;this.arrHistory := [] ;记录所有已运行的命令
+            this.lastAction := []
             ;this.modeList := map()
             this.currentMode := ""
             this.currentHotIfWin := ""
@@ -436,27 +438,15 @@ class vimd {
         ;byScript 非手工按键，而是用脚本触发时，需要传入此参数，如 VimD_WeChat.win.keyIn("F3", "ahk_exe WeChat.exe")
         keyIn(ThisHotkey, byScript:=0) {
             keyMap := vimd.key_hot2map(ThisHotkey)
-            OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------start", A_LineFile,A_LineNumber,A_ThisFunc))
-            OutputDebug(format("currentMode.index={1}", this.currentMode.index))
-            OutputDebug(format("arrKeymapPressed.length = {1}", this.currentMode.arrKeymapPressed.length))
-            OutputDebug(format("keyMap={1}", keyMap))
-            OutputDebug(format("typeSuperVim = {1}", this.typeSuperVim ))
-            OutputDebug(format("objKeySuperVim={1}", json.stringify(this.objKeySuperVim)))
-            OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------end", A_LineFile,A_LineNumber,A_ThisFunc))
+            ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------start", A_LineFile,A_LineNumber,A_ThisFunc))
+            ;OutputDebug(format("currentMode.index={1}", this.currentMode.index))
+            ;OutputDebug(format("arrKeymapPressed.length = {1}", this.currentMode.arrKeymapPressed.length))
+            ;OutputDebug(format("keyMap={1}", keyMap))
+            ;OutputDebug(format("typeSuperVim = {1}", this.typeSuperVim ))
+            ;OutputDebug(format("objKeySuperVim={1}", json.stringify(this.objKeySuperVim)))
+            ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------end", A_LineFile,A_LineNumber,A_ThisFunc))
             ;NOTE 记录当前的窗口，用来出错后 init
             vimd.winCurrent := this
-            bChecked := false
-            ;第一个按键 && 无视模式的按键
-            if (this.currentMode.arrKeymapPressed.length == 0) {
-                if (keyMap == this.keySuperVim) { ;如 {RControl}
-                    this.setSuperMode(1, true)
-                    exit
-                } else if (this.objKeySuperVim.has(keyMap)) { ;<super>
-                    OutputDebug(format("i#{1} {2}:{3} is <super>", A_LineFile,A_LineNumber,keyMap))
-                    this.setSuperMode(2)
-                    bChecked := true
-                }
-            }
             this.currentMode._keyIn(keyMap, byScript)
             if (this.currentMode.onAfterKey)
                 this.currentMode.onAfterKey.call(keyMap)
@@ -478,8 +468,6 @@ class vimd {
             else if (modename != "") ;修改内置模式名
                 vimd.arrModeName[this.index+1] := modename
             this.name := this.win.name . "-" . vimd.arrModeName[this.index+1]
-            ;this.funcDo := ""
-            this.objDoSave := {} ;保存上个 objDo
             this.objTips := map() ;NOTE 大纲提示(可动态在命令里用 this.mode1.objTips[key] 来添加)
             this.objTips.CaseSense := true
             this.objFunDynamic := map() ;记录所有需要验证动态信息的按键(可以快速过滤无关按键)
@@ -514,7 +502,6 @@ class vimd {
             OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
             ;自身属性
             this.arrKeymapPressed := [] ;记录每个按键
-            ;this.funcDo := ""
             this.tipsDynamic := "" ;NOTE 动态生成，所以不需要 map()
             if (this.win.typeSuperVim)
                 this.win.exitSuperMode()
@@ -540,45 +527,59 @@ class vimd {
         ;NOTE 被keyIn调用
         _keyIn(keyMap, byScript) {
             OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
-            if (this.arrKeymapPressed.length) {
+            ;第一个按键
+            if (this.arrKeymapPressed.length == 0) {
+                ;无视模式的按键(TODO 从 keyIn 移到这里，待验证)
+                if (keyMap == this.win.keySuperVim) { ;如 {RControl}
+                    this.win.setSuperMode(1, true)
+                    exit
+                } else if (this.win.objKeySuperVim.has(keyMap)) { ;<super>
+                    OutputDebug(format("i#{1} {2}:{3} is <super>", A_LineFile,A_LineNumber,keyMap))
+                    this.win.setSuperMode(2)
+                }
+                ;NOTE 判断当前匹配窗口 update 用
+                this.thisHotIfWin := (byScript==0) ? vimd.getHotIfWin() : this.win.arrHotIfWin[1] ;NOTE 不太准确，可能两个窗口都定义了此按键
+                ;4. 判断 onBeforeKey
+                if (this.win.typeSuperVim==0 && isobject(this.onBeforeKey)) { ;NOTE typeSuperVim 则不执行 onBeforeKey
+                    if (this.onBeforeKey.call(keyMap) == 0) { ;返回 false，则相当于 None 模式
+                        OutputDebug(format("d#{1} {2}:onBeforeKey false", A_LineFile,A_LineNumber))
+                        send(vimd.key_map2send(keyMap))
+                        exit
+                    }
+                }
+                ;自动运行 objFunDynamic()
+                if (this.HasOwnProp("objFunDynamic") && this.objFunDynamic.has(keyMap)) {
+                    OutputDebug(format("i#{1} {2}:{3}.objFunDynamic({4})", A_LineFile,A_LineNumber,this.name,keyMap))
+                    this.arrListDynamic := [] ;NOTE 每次都要清空
+                    this.objFunDynamic[keyMap].call()
+                    OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
+                } else {
+                    OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
+                }
+                ;非常规功能
+                if this.objKeysmap.has(keyMap) { ;单键功能
+                    OutputDebug(format("this.objKeysmap.has({1}) do={2}", keyMap,this.objKeysmap[keyMap]["comment"]))
+                    if (keyMap ~= "^\d$") {
+                        this.dealCount(integer(keyMap)) ;因为要传入参数，所以单独处理
+                    } else if (keyMap == ".") {
+                        this.doGlobal_Repeat() ;一般是 do(objDo["action"], this.win.GetCount())，repeat 刚好相反
+                        this.init()
+                    } else {
+                        this.do(this.objKeysmap[keyMap]["action"], this.win.GetCount())
+                        this.init()
+                    }
+                    exit
+                } else {
+                    OutputDebug(format("this.objKeysmap.not has({1})", keyMap))
+                    if (this.index == 0) {
+                        send(vimd.key_map2send(keyMap))
+                    } else {
+                        this.update(keyMap)
+                    }
+                }
+            } else {
                 this.update(keyMap)
                 return
-            }
-            ;NOTE 以第一个键判断当前匹配窗口
-            this.thisHotIfWin := (byScript==0) ? vimd.getHotIfWin() : this.win.arrHotIfWin[1] ;NOTE 不太准确，可能两个窗口都定义了此按键
-            ;4. 判断 onBeforeKey
-            if (this.win.typeSuperVim==0 && isobject(this.onBeforeKey)) { ;NOTE typeSuperVim 则不执行 onBeforeKey
-                if (this.onBeforeKey.call(keyMap) == 0) { ;返回 false，则相当于 None 模式
-                    OutputDebug(format("d#{1} {2}:onBeforeKey false", A_LineFile,A_LineNumber))
-                    send(vimd.key_map2send(keyMap))
-                    exit
-                }
-            }
-            ;自动运行 objFunDynamic()
-            if (this.HasOwnProp("objFunDynamic") && this.objFunDynamic.has(keyMap)) {
-                OutputDebug(format("i#{1} {2}:{3}.objFunDynamic({4})", A_LineFile,A_LineNumber,this.name,keyMap))
-                this.arrListDynamic := [] ;NOTE 每次都要清空
-                this.objFunDynamic[keyMap].call()
-                OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
-            } else {
-                OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
-            }
-            ;非常规功能
-            if this.objKeysmap.has(keyMap) { ;单键功能
-                OutputDebug(format("this.objKeysmap.has({1}) do={2}", keyMap,this.objKeysmap[keyMap]["comment"]))
-                if (keyMap ~= "^\d$") {
-                    this.dealCount(integer(keyMap))
-                } else {
-                    this.do(this.objKeysmap[keyMap])
-                }
-                exit
-            } else {
-                OutputDebug(format("this.objKeysmap.not has({1})", keyMap))
-                if (this.index == 0) {
-                    send(vimd.key_map2send(keyMap))
-                } else {
-                    this.update(keyMap)
-                }
             }
         }
 
@@ -621,7 +622,8 @@ class vimd {
                 this.init()
             } else if (arrMatch.length == 1) { ;单个结果
                 ;msgbox(json.stringify(arrMatch[1], 4))
-                this.do(arrMatch[1])
+                this.do(arrMatch[1]["action"], this.win.GetCount())
+                this.init()
             } else { ;大部分情况
                 this.showTips(arrMatch)
             }
@@ -691,12 +693,12 @@ class vimd {
                 this.mapkey(this.win.keyDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
                 if bCount
                     this.mapCount()
-                this.mapkey("." ,ObjBindMethod(this,"doGlobal_Repeat"),"重做")
+                this.mapkey("." ,"","重做")
             }
         }
         mapCount() {
             loop(10)
-                this.mapkey(string(A_Index-1),ObjBindMethod(this,"dealCount"),format("<{1}>", A_Index-1)) ;TODO keyIn
+                this.mapkey(string(A_Index-1),"",format("<{1}>", A_Index-1))
         }
 
         ;keysmap类型 <^enter> {F1} + A
@@ -716,6 +718,7 @@ class vimd {
             this.objKeysmap[keysmap] := objDo
         }
         ;把定义打包为 objDo
+        ;如果 funcObj 在 keyIn 里明确了逻辑，则这里随便定义都行，比如 mapCount
         _map(keysmap, funcObj, comment) {
             objDo := this.key_map2arrHot(keysmap)
             objDo["action"] := funcObj
@@ -727,7 +730,7 @@ class vimd {
                         this.win.objKeySuperVim[vimd.key_hot2map(v)] := 1
                 }
                 if (!this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin].has(v)) { ;单键避免重复定义
-                    hotkey(v, ObjBindMethod(this.win,"keyIn")) ;NOTE 相关的键全部要拦截，用 vimd 控制
+                    hotkey(v, ObjBindMethod(this.win,"keyIn")) ;NOTE 相关的键全部拦截，用 vimd 控制
                     this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin][v] := 1
                 }
             }
@@ -794,85 +797,74 @@ class vimd {
         ;}
 
         ;最终执行的命令
-        ;NOTE 自动 init()
-        do(objDo) {
+        ;因为 doGlobal_Repeat 调用，所以把 cnt 放参数
+        do(varDo, cnt) {
             vimd.hideTips()
-            ;msgbox(this.win.isRepeat . "`n" . json.stringify(objDo, 4))
-            cnt := this.win.GetCount()
+            ;处理 repeat 和 count
+            if (!this.win.isRepeat) {
+                this.win.LastAction := [varDo, cnt]
+                ;this.win.arrHistory.push([varDo, cnt])
+            }
             ;timeSave := A_TickCount
-            this.init(0)
             ;NOTE 运行
             loop(cnt) {
-                this.callFunc(objDo["action"], true)
+                this.callFunc(varDo, true)
                 if this.win.isBreak ;运行后才知道是否 isBreak
                     break
             }
             ;tooltip(A_TickCount - timeSave,,, 9)
             ;SetTimer(tooltip.bind(,,, 9), -1000)
-            ;处理 repeat 和 count
-            if !this.win.isRepeat {
-                this.objDoSave := objDo
-                this.CountSave := cnt
-            }
-            ;if isobject(this.onAfterDo)
-            ;    this.callFunc(this.onAfterDo)
-            this.init()
+            if isobject(this.onAfterDo)
+                this.callFunc(this.onAfterDo)
         }
 
         ;NOTE 这里不能初始化 isBreak
         ;网址没在内
         callFunc(funcObj, errExit:=false) {
-            res := hyf_do(funcObj)
-            if !res {
-                if errExit
-                    exit
-                else
-                    throw OSError("action not find")
+            if !(funcObj is string) {
+                funcObj()
+                return 1
             }
-            hyf_do(var) {
-                if !(var is string) {
-                    var()
+            try {
+                if (type(%funcObj%) ~= "^(ObjBindMethod|Closure|BoundFunc|Func)$") {
+                    %funcObj%()
                     return 1
                 }
-                try {
-                    if (type(%var%) ~= "^(ObjBindMethod|Closure|BoundFunc|Func)$") {
-                        %var%()
-                        return 1
-                    }
-                }
-                if !(var ~= "i)^[a-z]:[\\/]") {
-                    if (var ~= "^\w+\(\S*\)$") { ;运行function()
-                        arr := StrSplit(substr(var, 1, strlen(var)-1), "(")
-                        (arr[2]=="") ? %arr[1]%() : %arr[1]%(arr[2])
-                        return 1
-                    } else if (var ~= "^(\w+)\.(\w+)\((.*)\)$") { ;NOTE 运行 class.method(param1)
-                        RegExMatch(var, "^(\w+)\.(\w+)\((.*)\)$", &m)
-                        (m[3] != "") ?  %m[1]%.%m[2]%(m[3]) : %m[1]%.%m[2]%()
-                        return 1
-                    }
-                    if (var ~= '^\{\w{8}(-\w{4}){3}-\w{12}\}$') { ;clsid
-                        var := "explorer.exe shell:::" . var
-                    } else if (var ~= '^\w+\.cpl(,@?\d?)*$') { ;cpl
-                        var := "control.exe " . var
-                        ;} else if (substr(var,1,12) == "ms-settings:") {
-                        ;    var := var
-                        ;} else if (var ~= 'i)^control(\.exe)?\s+\w+\.cpl$') {
-                        ;    var := var
-                    }
-                    tooltip(var)
-                    run(var)
-                    SetTimer(tooltip, -1000)
-                    return 1
-                } else { ;打开文件，需要判断文件是否已打开，所以不处理
-                    return 0
-                }
             }
+            if !(funcObj ~= "i)^[a-z]:[\\/]") {
+                if (funcObj ~= "^\w+\(\S*\)$") { ;运行function()
+                    arr := StrSplit(substr(funcObj, 1, strlen(funcObj)-1), "(")
+                    (arr[2]=="") ? %arr[1]%() : %arr[1]%(arr[2])
+                    return 1
+                } else if (funcObj ~= "^(\w+)\.(\w+)\((.*)\)$") { ;NOTE 运行 class.method(param1)
+                    RegExMatch(funcObj, "^(\w+)\.(\w+)\((.*)\)$", &m)
+                    (m[3] != "") ?  %m[1]%.%m[2]%(m[3]) : %m[1]%.%m[2]%()
+                    return 1
+                }
+                if (funcObj ~= '^\{\w{8}(-\w{4}){3}-\w{12}\}$') { ;clsid
+                    funcObj := "explorer.exe shell:::" . funcObj
+                } else if (funcObj ~= '^\w+\.cpl(,@?\d?)*$') { ;cpl
+                    funcObj := "control.exe " . funcObj
+                    ;} else if (substr(funcObj,1,12) == "ms-settings:") {
+                    ;    funcObj := funcObj
+                    ;} else if (funcObj ~= 'i)^control(\.exe)?\s+\w+\.cpl$') {
+                    ;    funcObj := funcObj
+                }
+                tooltip(funcObj)
+                run(funcObj)
+                SetTimer(tooltip, -1000)
+                return 1
+            }
+            if errExit
+                exit
+            else
+                throw OSError("action not find")
         }
 
         ;TODO 是否设置全局，这样出提示后，在其他未定义软件界面按键也能退出
         doGlobal_Escape() {
-            OutputDebug(A_ThisFunc)
-            OutputDebug(format("this.index = {1}", this.index))
+            OutputDebug(format("d#{1} {2}:A_ThisFunc={3}", A_LineFile,A_LineNumber,A_ThisFunc))
+            OutputDebug(format("i#{1} {2}:this.index={3}", A_LineFile,A_LineNumber,this.index))
             if (this.index == 0) {
                 if (this.HasOwnProp("funCheckEscape") && this.funCheckEscape.call())
                     send("{escape}")
@@ -886,7 +878,8 @@ class vimd {
             } else if (!this.arrKeymapPressed.length && !this.win.count) {
                 send("{escape}")
             } else {
-                this.init()
+                OutputDebug(format("i#{1} {2}: isBreak", A_LineFile,A_LineNumber))
+                this.win.isBreak := true
             }
         }
 
@@ -935,7 +928,10 @@ class vimd {
         }
         doGlobal_Repeat() {
             this.win.isRepeat := true
-            this.do(this.objDoSave)
+            if (this.win.count)
+                this.win.lastAction[2] := this.win.GetCount() ;覆盖 lastAction 的count
+            this.do(this.win.lastAction*)
+            this.win.isRepeat := false
         }
         doGlobal_Up() {
             send("{up}")
@@ -1021,7 +1017,7 @@ class vimd {
         _show(str) {
             if (isobject(this.win.funTipsCoordinate)) {
                 cmToolTip := A_CoordModeToolTip
-                CoordMode("ToolTip", "window")
+                CoordMode("ToolTip", "window") ;强制为 window 模式
                 arrXY := this.win.funTipsCoordinate.call()
                 tooltip(str, arrXY[1], arrXY[2], vimd.tipLevel)
                 CoordMode("ToolTip", cmToolTip)
