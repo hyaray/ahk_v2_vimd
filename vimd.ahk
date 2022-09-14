@@ -264,7 +264,7 @@ class vimd {
             this.name := name
             this.arrMode := [] ;默认2个模式
             this.arrHotIfWin := [] ;记录所有 currentHotIfWin
-            ;this.arrHistory := [] ;记录所有已运行的命令
+            this.arrHistory := [] ;记录所有已运行的命令
             this.lastAction := []
             ;this.modeList := map()
             this.currentMode := ""
@@ -558,13 +558,14 @@ class vimd {
                 }
                 ;非常规功能
                 if this.objKeysmap.has(keyMap) { ;单键功能
-                    OutputDebug(format("this.objKeysmap.has({1}) do={2}", keyMap,this.objKeysmap[keyMap]["comment"]))
+                    OutputDebug(format("this.objKeysmap.has({1}) comment={2}", keyMap,this.objKeysmap[keyMap]["comment"]))
                     if (keyMap ~= "^\d$") {
                         this.dealCount(integer(keyMap)) ;因为要传入参数，所以单独处理
                     } else if (keyMap == ".") {
                         this.doGlobal_Repeat() ;一般是 do(objDo["action"], this.win.GetCount())，repeat 刚好相反
                         this.init()
                     } else {
+                        this.strCache := this.objKeysmap[keyMap]["string"]
                         this.do(this.objKeysmap[keyMap]["action"], this.win.GetCount())
                         this.init()
                     }
@@ -598,14 +599,14 @@ class vimd {
                 this.arrKeymapPressed.push(keyMap)
             }
             arrMatch := [] ;记录所有匹配热键(不分动态和普通)
-            strCache := this.getStrCache()
-            OutputDebug(format("i#{1} {2}:strCache={3}", A_LineFile,A_LineNumber,strCache))
+            this.strCache := this.getStrCache()
+            OutputDebug(format("i#{1} {2}:this.strCache={3}", A_LineFile,A_LineNumber,this.strCache))
             ;匹配动态命令
             if (keyMap == "\")
                 this.addTipsDynamic(this.name)
             ;   命令列表是在第1个键动态生成，后续按键需要动态更新
             for objDo in this.arrListDynamic {
-                if (instr(objDo["string"],strCache,true) == 1)
+                if (instr(objDo["string"],this.strCache,true) == 1)
                     arrMatch.push(objDo)
             }
             OutputDebug(format("i#{1} {2}:after check doListDynamic, arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
@@ -622,6 +623,7 @@ class vimd {
                 this.init()
             } else if (arrMatch.length == 1) { ;单个结果
                 ;msgbox(json.stringify(arrMatch[1], 4))
+                this.strCache := arrMatch[1]["string"]
                 this.do(arrMatch[1]["action"], this.win.GetCount())
                 this.init()
             } else { ;大部分情况
@@ -632,7 +634,7 @@ class vimd {
                 if (this.objHotIfWin_FirstKey[winTitle].has(this.arrKeymapPressed[1])) {
                     for objDo in this.objHotIfWin_FirstKey[winTitle][this.arrKeymapPressed[1]] {
                         OutputDebug(format('i#{1} {2}:objDo["string"]={3}', A_LineFile,A_LineNumber,objDo["string"]))
-                        if (instr(objDo["string"],strCache,true) == 1) { ;NOTE 匹配大小写
+                        if (instr(objDo["string"],this.strCache,true) == 1) { ;NOTE 匹配大小写
                             arrMatch.push(objDo)
                             arrThis.push(objDo["string"])
                         }
@@ -691,6 +693,7 @@ class vimd {
                 this.mapkey(this.win.keyDebug . "=",ObjBindMethod(this,"doGlobal_objHotIfWins"),"查看所有窗口关系objHotIfWins")
                 this.mapkey(this.win.keyDebug . "-",ObjBindMethod(this,"doGlobal_Debug_objSingleKey"),"查看所有拦截的按键 objHotIfWin_SingleKey")
                 this.mapkey(this.win.keyDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
+                this.mapkey(this.win.keyDebug . "/",ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
                 if bCount
                     this.mapCount()
                 this.mapkey("." ,"","重做")
@@ -798,12 +801,13 @@ class vimd {
 
         ;最终执行的命令
         ;因为 doGlobal_Repeat 调用，所以把 cnt 放参数
+        ;为什么第一个参数不用 objDo
         do(varDo, cnt) {
             vimd.hideTips()
             ;处理 repeat 和 count
             if (!this.win.isRepeat) {
-                this.win.LastAction := [varDo, cnt]
-                ;this.win.arrHistory.push([varDo, cnt])
+                this.win.LastAction := [varDo, cnt, this.strCache]
+                this.win.arrHistory.push(this.win.LastAction)
             }
             ;timeSave := A_TickCount
             ;NOTE 运行
@@ -930,7 +934,7 @@ class vimd {
             this.win.isRepeat := true
             if (this.win.count)
                 this.win.lastAction[2] := this.win.GetCount() ;覆盖 lastAction 的count
-            this.do(this.win.lastAction*)
+            this.do(this.win.lastAction[1], this.win.lastAction[2])
             this.win.isRepeat := false
         }
         doGlobal_Up() {
@@ -989,6 +993,12 @@ class vimd {
                 res .= format("{1}`n", k)
             msgbox(res,,0x40000)
         }
+        doGlobal_Debug_arrHistory() {
+            res := ""
+            for arr in this.win.arrHistory
+                res .= format("{1}, {2}`n", arr[3], arr[2])
+            msgbox(res,,0x40000)
+        }
 
         ;-----------------------------------tip-----------------------------------
 
@@ -999,12 +1009,10 @@ class vimd {
 
         showTips(arrMatch) {
             OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
-            strCache := this.getStrCache()
-            ;sKey := (strCache ~= "^[A-Z]$") ? "S-" . strCache : strCache
-            sKey := strCache
-            strTooltip := this.objTips.has(sKey)
-                ? strCache . A_Tab . this.objTips[sKey]
-                : strCache
+            ;this.strCache := this.getStrCache()
+            strTooltip := this.objTips.has(this.strCache)
+                ? format("{1}`t{2}", this.strCache,this.objTips[this.strCache])
+                : this.strCache
             strTooltip .= this.tipsDynamic ;NOTE 添加动态信息
             strTooltip .= "`n=====================`n"
             for objDo in arrMatch
