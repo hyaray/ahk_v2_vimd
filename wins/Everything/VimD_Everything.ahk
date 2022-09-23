@@ -101,7 +101,7 @@ class VimD_Everything extends _ET {
     ;40051
     static SearchIssue() { ;部分文件搜不到
         sleep(100)
-        PostMessage(0x111, 40074, , , "A")
+        PostMessage(0x111, 40074,,, "A")
         msgbox("1、查看选项→索引→NTFS，确认所有分区都【包含到数据库】`n2、如果断电，硬盘的数据可能有缺失，对硬盘所有文件右键属性，让它重新遍历文件数")
     }
 
@@ -125,7 +125,7 @@ class VimD_Everything extends _ET {
     ;光标选中的文件路径
     static currentFilePath() {
         arr := StrSplit(ListViewGetContent("Selected", "SysListView321", "ahk_class EVERYTHING"), A_Tab)
-        if arr.length
+        if (arr.length)
             return format("{1}\{2}", arr[2],arr[1])
     }
 
@@ -176,7 +176,7 @@ class _ET {
     ;有些窗口不需要记录窗口id
     static smartWin(fpOrFn, funcHwndOrwinClass:="", objFunApi:="", allWin:=0) {
         ;获取 exeName
-        if instr(fpOrFn, ":")
+        if (instr(fpOrFn, ":"))
             SplitPath(fpOrFn, &exeName)
         else
             exeName := fpOrFn
@@ -193,10 +193,10 @@ class _ET {
             noExt := "_" . noExt
         ;处理逻辑
         ;OutputDebug(format("i#{1} {2}:ProcessExist(exeName)={3}", A_LineFile,A_LineNumber,ProcessExist(exeName)))
-        if !ProcessExist(exeName) {
+        if (!ProcessExist(exeName)) {
             smartRun()
-        } else if WinActive(winTitle) {
-            if isobject(objFunApi) && objFunApi.has("bh") ;返回 运行函数
+        } else if (WinActive(winTitle)) {
+            if (isobject(objFunApi) && objFunApi.has("bh")) ;返回 运行函数
                 objFunApi["bh"].call()
             WinHide
             if (allWin) {
@@ -226,7 +226,7 @@ class _ET {
                     SetTimer(tooltip, -1000)
                 }
             }
-            if isobject(objFunApi) && objFunApi.has("aa")
+            if (isobject(objFunApi) && objFunApi.has("aa"))
                 objFunApi["aa"].call()
         }
         smartRun() {
@@ -236,17 +236,18 @@ class _ET {
                 params := objFunApi["br"]() ;TODO 待验证 删除了 .call
             fp := instr(fpOrFn, ":") ? fpOrFn : _ET.get(fpOrFn)
             SplitPath(fp, &fn, &dir)
-            if strlen(params)
+            if (params != "")
                 fp := format("{1} {2}", fp,params)
+            OutputDebug(format("i#{1} {2}:fp={3}", A_LineFile,A_LineNumber,fp))
             ;打开程序
             try
                 run(fp, dir)
             catch
                 throw ValueError(fp)
             ;打开后自动运行
-            if isobject(objFunApi) && objFunApi.has("ar") ;返回 运行函数
+            if (isobject(objFunApi) && objFunApi.has("ar")) { ;返回 运行函数
                 objFunApi["ar"].call()
-            else {
+            } else {
                 ;sleep(1000)
                 ;if !ProcessExist(exeName) {
                 ;    msgbox(exeName . "`n未出现，打开软件失败",,0x40000)
@@ -263,17 +264,17 @@ class _ET {
     static search(filename, exclude:="") { ;返回为数组，部分路径(分隔符不能是/)
         findInDir := false
         if (filename ~= "i)^[a-z]:[\\/]") {
-            if FileExist(filename)
+            if (FileExist(filename))
                 return [filename]
             else
                 findInDir := true
         }
         ;确定修饰词sType
-        if findInDir
+        if (findInDir)
             sType := ""
         else if (filename ~= "\\$") ;文件夹
             sType := "folder:"
-        else if instr(filename, "\")
+        else if (instr(filename, "\"))
             sType := "file:" ;NOTE file:后面的*能确保匹配结果末尾一致
         else
             sType := "wfn:"
@@ -281,7 +282,7 @@ class _ET {
         ;if (filename ~= "\\.*[^\\]$") ;1.部分路径的文件，加*配合file:使用
         if !findInDir && (filename ~= "\\\S") ;1.部分路径的文件，加*配合file:使用
             filename := "*" . filename
-        if filename ~= "\\$" ;2.删除末尾\
+        if (filename ~= "\\$") ;2.删除末尾\
             filename := RTrim(filename, "\")
         if !findInDir && instr(filename, A_Space) ;3.包含空格，则两边加上"
             filename := '"' . filename . '"' ;NOTE 搜文件夹必须去掉末尾的\
@@ -295,7 +296,7 @@ class _ET {
             hModule := dllcall("LoadLibrary", "str",this.dll)
         dllcall(this.dll . "\Everything_SetSearch", "str",sSearch)
         ;msgbox(FileExist(this.dll))
-        if dllcall(this.dll . "\Everything_Query", "int",1) { ;搜索成功
+        if (dllcall(this.dll . "\Everything_Query", "int",1)) { ;搜索成功
             n := dllcall(this.dll . "\Everything_GetTotResults")
             if (!n)
                 return [filename] ;系统应用比如mspaint.exe，res未加载，直接返回mspaint.exe
@@ -316,7 +317,7 @@ class _ET {
     ;获取Everything的单个搜索结果
     ;部分路径(分隔符用\)，搜文件夹则末尾加上\
     static get(filename) { ;从Everything多个结果中选择一个，如果没则返回空
-        if filename ~= "i)^[a-z]:[\\/]" && FileExist(filename)
+        if (filename ~= "i)^[a-z]:[\\/]" && FileExist(filename))
             return filename
         if (filename ~= "\.exe$") ;TODO 不搜c:\windows的exe
             exclude := this.exclude
@@ -324,7 +325,7 @@ class _ET {
             exclude := StrReplace(this.exclude, "!c:\windows\", "!c:\") ;不搜C:\的文档资料
         fps := this.search(filename, exclude)
         n := fps.length
-        if n { ;有找到
+        if (n) { ;有找到
             if (n == 1)
                 return fps[1]
             else
@@ -333,9 +334,9 @@ class _ET {
             p := RegRead("HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\control\Session Manager\Environment", "PATH")
             loop parse, p, "`;" {
                 fp := format("{1}\{2}", A_LoopField,filename)
-                if instr(fp, "%")
+                if (instr(fp, "%"))
                     fp := var2Str(fp)
-                if FileExist(fp)
+                if (FileExist(fp))
                     return fp
             }
         }
@@ -344,7 +345,7 @@ class _ET {
             startPos := 1
             loop { ;有变量
                 p := RegExMatch(str, reg, &m, startPos)
-                if p {
+                if (p) {
                     varPath := EnvGet(m[2])
                     if (varPath != "") {
                         startPos := m.pos(2)+ strlen(varPath) - 1
@@ -393,10 +394,10 @@ class _ET {
         if !dllcall("GetModuleHandle", "str",this.dll)
             hModule := dllcall("LoadLibrary", "str",this.dll)
         dllcall(this.dll . "\Everything_SetSearch", "str",sSearch)
-        if nSort
+        if (nSort)
             dllcall(this.dll . "\Everything_SetSort", "uint",nSort)
         ;dllcall(this.dll . "\Everything_SetMax", "int",3) ;使用 count:3 限制数量更好
-        if dllcall(this.dll . "\Everything_Query", "uint",true) { ;等待结果
+        if (dllcall(this.dll . "\Everything_Query", "uint",true)) { ;等待结果
             n := dllcall(this.dll . "\Everything_GetNumResults")
             dllcall(this.dll . "\Everything_GetTotResults")
             if !n ;NOTE mklink的文件夹，此搜索会有问题
@@ -410,6 +411,11 @@ class _ET {
             ;dllcall("FreeLibrary", "Ptr", hModule)
             return arr
         }
+    }
+
+    ;搜索扩展名最新文件
+    static searchExtNewFile(ext) {
+        run(format("{1} -sort-descending -search *.{2}", this.spath,ext))
     }
 
     ;NOTE 返回arr
@@ -441,9 +447,9 @@ class _ET {
 
     static onekey(bCopy:=false) {
         sSearch := bCopy ? hyf_getSelect() : ""
-        if WinActive("ahk_class EVERYTHING") {
+        if (WinActive("ahk_class EVERYTHING")) {
             WinHide
-            MouseGetPos(, , &idA)
+            MouseGetPos(,, &idA)
             WinActivate("ahk_id " . idA)
         } else if (sSearch != "") {
             if (sSearch.isabs() || (sSearch ~= "^\\\\"))
@@ -468,7 +474,7 @@ class _ET {
             numput("UPtr", 2, cds)
             numput("UPtr", size, cds, A_PtrSize)
             numput("UPtr", query.ptr, cds, A_PtrSize*2)
-            SendMessage(0x4A, hwnd, &cds, , "ahk_id " . idEv)
+            SendMessage(0x4A, hwnd, &cds,, "ahk_id " . idEv)
             ;if errorlevel != FAIL
             ;return 1
         } else
@@ -478,8 +484,8 @@ class _ET {
 
     static version(a) {
         idEv := WinExist("ahk_class EVERYTHING_TASKBAR_NOTIFICATION")
-        if idEv
-            return SendMessage(0x400, a, 0, , "ahk_id " . idEv)
+        if (idEv)
+            return SendMessage(0x400, a,,, "ahk_id " . idEv)
 
     }
 
@@ -491,7 +497,7 @@ class _ET {
 	    )
         SendMessage(0x147, 0, 0, "Edit1", "A")
         str_EvEdit1 := ControlGetText("Edit1", "A")
-        if instr(str_EvEdit1, "case:") {
+        if (instr(str_EvEdit1, "case:")) {
             str_EvEdit1 := StrReplace(str_EvEdit1, "case:")
             ControlSetText(str_EvEdit1, "Edit1", "A")
         } else
@@ -518,7 +524,7 @@ class _ET {
                 fn := strget(dllcall(this.dll . "\Everything_GetResultFileName", "int",i)) ;res用fn(如QQ.exe)当Key
                 VarSetStrCapacity(&fp, 256)
                 dllcall(this.dll . "\Everything_GetResultFullPathName", "int",i, "str",fp, "int",128)
-                if res.has(fn) {
+                if (res.has(fn)) {
                     continue ;只获取第一个结果 TODO
                     ;if !isobject(res[fn]) ;有多个结果
                     ;res[fn] := [res[fn]]
