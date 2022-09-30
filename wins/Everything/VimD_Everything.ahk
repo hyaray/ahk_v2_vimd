@@ -198,7 +198,7 @@ class _ET {
         } else if (WinActive(winTitle)) {
             if (isobject(objFunApi) && objFunApi.has("bh")) ;返回 运行函数
                 objFunApi["bh"].call()
-            WinHide
+            WinHide(winTitle)
             if (allWin) {
                 for hwnd in WinGetList(winTitle)
                     WinHide("ahk_id " . hwnd)
