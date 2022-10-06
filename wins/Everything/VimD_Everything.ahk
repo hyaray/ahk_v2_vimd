@@ -67,28 +67,28 @@ class VimD_Everything extends _ET {
         if (this != VimD_Everything)
             return
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
-
         this.mode1 := this.win.initMode(1, true, true)
-
         this.win.setKeySuperVim()
 
         ;hotkey("F4", (p*)=>_ET.smartDo())
-        ;hotkey("F12", (p*)=>PostMessage(0x111, 40074,,, "A"))
 
         this.mode1.setObjHotWin("ahk_class EVERYTHING")
 
         this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
         this.mode1.mapkey("b",(p*)=>VimD_Everything.compare(),"比较")
-        this.mode1.mapkey("<super>{F5}i",(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
-        this.mode1.mapkey("<super>{F5}r",(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
-        this.mode1.mapkey("<super>{F5}a",(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
+        this.mode1.mapkey("<super>{F5}{F5}",(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
         this.mode1.mapkey("<super>{F5}f",(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
         this.mode1.mapkey("<super>{F5}d",(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
+        this.mode1.mapkey("<super>{F5}e",(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
+        this.mode1.mapkey("<super>{F5}i",(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
+        this.mode1.mapkey("<super>{F5}r",(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
+        this.mode1.mapkey("<super>{F5}1",(p*)=>VimD_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
 
         ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(VimD_Everything.currentFilePath()),"vim打开")
         this.mode1.mapkey("r",(p*)=>run(VimD_Everything.currentFilePath()),"run")
-
-        this.mode1.mapkey("<super>{F12}{F12}",(p*)=>PostMessage(0x111, 40074,,, "A"),"打开配置")
+        this.mode1.mapkey("<super>{F12}{F12}",(p*)=>VimD_Everything.openOption(),"打开配置")
+        this.mode1.mapkey("<super>{F12}k",(p*)=>VimD_Everything.openOption("常规\快捷键"),"配置-快捷键")
+        this.mode1.mapkey("<super>{F12}i",(p*)=>VimD_Everything.openOption("索引\排除列表"),"配置-排除列表")
         this.mode1.mapkey("<super>{F12}u",ObjBindMethod(VimD_Everything,"update"),"更新")
     }
 
@@ -98,10 +98,30 @@ class VimD_Everything extends _ET {
         msgbox("注意要同时更新dll文件(下载sdk包)",,0x40000)
     }
 
+    static toggleIgnore() {
+        if (0) {
+            run(format('{1} /exclude_list_enabled=1', _ET.spath))
+        } else {
+            VimD_Everything.openOption("索引\排除列表")
+            send("{alt down}e{alt up}")
+        }
+    }
+
+    static post(n) {
+        PostMessage(0x111, n,,, "ahk_class EVERYTHING")
+    }
+
+    static openOption(item:="") {
+        this.post(40074)
+        WinWaitActive("ahk_class #32770")
+        if (item != "")
+            _TreeView("SysTreeView321").selectByPath(item)
+    }
+
     ;40051
     static SearchIssue() { ;部分文件搜不到
         sleep(100)
-        PostMessage(0x111, 40074,,, "A")
+        this.openOption()
         msgbox("1、查看选项→索引→NTFS，确认所有分区都【包含到数据库】`n2、如果断电，硬盘的数据可能有缺失，对硬盘所有文件右键属性，让它重新遍历文件数")
     }
 
@@ -326,10 +346,15 @@ class _ET {
         fps := this.search(filename, exclude)
         n := fps.length
         if (n) { ;有找到
-            if (n == 1)
+            if (n >= 1) {
+                arrRes := hyf_tooltipAsMenu(fps)
+                if (arrRes.length >= 2)
+                    return arrRes[2]
+                else
+                    return ""
+            } else {
                 return fps[1]
-            else
-                return hyf_tooltipAsMenu(fps)[2]
+            }
         } else if !(filename ~= "\\|\/") { ;不包含/或\，则继续从PATH里寻找
             p := RegRead("HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\control\Session Manager\Environment", "PATH")
             loop parse, p, "`;" {

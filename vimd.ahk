@@ -525,6 +525,11 @@ class vimd {
                 this.objHotIfWins[winTitle] := arrWinTitle is array ? arrWinTitle : [arrWinTitle]
         }
 
+        setDynamic(key, objFun) {
+            this.objFunDynamic[key] := objFun
+            this._map(key) ;NOTE 定义的时候必须要确保 key 在拦截清单内
+        }
+
         ;NOTE 被keyIn调用
         _keyIn(keyMap, byScript, checkSuper:=true) {
             ;OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
@@ -545,7 +550,7 @@ class vimd {
                 ;4. 判断 onBeforeKey
                 if (this.win.typeSuperVim==0 && isobject(this.onBeforeKey)) { ;NOTE typeSuperVim 则不执行 onBeforeKey
                     if (this.onBeforeKey.call(keyMap) == 0) { ;返回 false，则相当于 None 模式
-                        OutputDebug(format("d#{1} {2}:onBeforeKey false", A_LineFile,A_LineNumber))
+                        ;OutputDebug(format("d#{1} {2}:onBeforeKey false", A_LineFile,A_LineNumber))
                         send(vimd.key_map2send(keyMap))
                         exit
                     }
@@ -690,12 +695,13 @@ class vimd {
                 this.mapkey(this.win.keyToMode0,ObjBindMethod(this.win,"changeMode",0),"进入 mode0")
                 ;NOTE 定义debug的内置功能，自带 <super> 参数
                 keymapDebug := format("<super>{1}", this.win.keyDebug)
-                this.mapkey(keymapDebug . "{F10}",ObjBindMethod(this,"doGlobal_Edit"),"【编辑】VimD_" . this.win.name)
+                this.mapkey(keymapDebug . keymapDebug,ObjBindMethod(this,"doGlobal_Edit"),"【编辑】VimD_" . this.win.name)
                 this.mapkey(keymapDebug . "[",ObjBindMethod(this,"doGlobal_objByFirstKey"),"查看所有功能(按窗口和首键分组)objHotIfWin_FirstKey")
                 this.mapkey(keymapDebug . "]",ObjBindMethod(this,"doGlobal_objKeysmap"),"查看所有功能(按keymap分组)objKeysmap")
                 this.mapkey(keymapDebug . "=",ObjBindMethod(this,"doGlobal_objHotIfWins"),"查看所有窗口关系objHotIfWins")
                 this.mapkey(keymapDebug . "-",ObjBindMethod(this,"doGlobal_Debug_objSingleKey"),"查看所有拦截的按键 objHotIfWin_SingleKey")
                 this.mapkey(keymapDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
+                this.mapkey(keymapDebug . "\",ObjBindMethod(this,"doGlobal_Debug_objFunDynamic"),"查看所有的<super>键 objFunDynamic")
                 this.mapkey(keymapDebug . "/",ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
                 if (bCount)
                     this.mapCount()
@@ -725,19 +731,19 @@ class vimd {
         }
         ;把定义打包为 objDo
         ;如果 funcObj 在 keyIn 里明确了逻辑，则这里随便定义都行，比如 mapCount
-        _map(keysmap, funcObj, comment) {
+        _map(keysmap, funcObj:=unset, comment:=unset) {
             objDo := this.key_map2arrHot(keysmap)
-            objDo["action"] := funcObj
-            objDo["comment"] := comment
-            objDo["hotwin"] := this.win.currentHotIfWin
-            for v in objDo["arrkey"] {
-                if (A_Index == 1) {
-                    if (objDo["super"]) ;记录超级键
-                        this.win.objKeySuperVim[vimd.key_hot2map(v)] := 1
-                }
-                if (!this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin].has(v)) { ;单键避免重复定义
-                    hotkey(v, ObjBindMethod(this.win,"keyIn")) ;NOTE 相关的键全部拦截，用 vimd 控制
-                    this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin][v] := 1
+            if (isset(comment)) {
+                objDo["action"] := funcObj
+                objDo["comment"] := comment
+                objDo["hotwin"] := this.win.currentHotIfWin
+            }
+            for key in objDo["arrkey"] {
+                if (A_Index == 1 && objDo["super"]) ;记录超级键
+                    this.win.objKeySuperVim[vimd.key_hot2map(key)] := 1
+                if (!this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin].has(key)) { ;单键避免重复定义
+                    hotkey(key, ObjBindMethod(this.win,"keyIn")) ;NOTE 相关的键全部拦截，用 vimd 控制
+                    this.win.objHotIfWin_SingleKey[this.win.currentHotIfWin][key] := 1
                 }
             }
             return objDo
@@ -873,10 +879,10 @@ class vimd {
             OutputDebug(format("d#{1} {2}:A_ThisFunc={3} index={4}", A_LineFile,A_LineNumber,A_ThisFunc,this.index))
             if (this.index == 0) {
                 if (this.HasOwnProp("funCheckEscape") && this.funCheckEscape.call()) {
-                    OutputDebug(format("i#{1} {2}:funCheckEscape=true", A_LineFile,A_LineNumber))
+                    OutputDebug(format("d#{1} {2}:funCheckEscape=true", A_LineFile,A_LineNumber))
                     send("{escape}")
                 } else {
-                    OutputDebug(format("i#{1} {2}:to mode1", A_LineFile,A_LineNumber))
+                    OutputDebug(format("d#{1} {2}:to mode1", A_LineFile,A_LineNumber))
                     this.win.changeMode(1)
                 }
             ;} else if (this.index > 0 && this.win.arrMode.length > 2) { ;TODO 更多模式，还是热键兼容问题
@@ -905,34 +911,12 @@ class vimd {
         doGlobal_Edit() {
             SplitPath(A_LineFile,, &dn)
             if (this.win.HasOwnProp("cls") && this.win.cls.HasOwnProp("getTitleEx")) {
-                title := this.win.cls.getTitleEx(1)
-                runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name), title)
+                title := this.win.cls.getTitleEx()
+                hyf_runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name), title)
+                OutputDebug(format("i#{1} {2}:title={3}", A_LineFile,A_LineNumber,title))
             } else {
-                runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name))
-            }
-            runByVim(fp, line:=0, params:="--remote-tab-silent") { ;用文本编辑器打开
-                if (line is integer) {
-                    if (line)
-                        params .= " +" . line
-                } else {
-                    if !instr(line, " ") {
-                        params .= format(' +/{1}', line)
-                        if !(line ~= "\/[+-]\d+$") ;查找内容没有偏移行数，则手工添加/(FIXME 临时方案)
-                            params .= "/"
-                    }
-                }
-                if (ProcessExist("gvim.exe"))
-                    WinShow("ahk_class Vim")
-                run(format('d:\TC\soft\Vim\gvim.exe {1} "{2}"', params, fp))
-                WinWait("ahk_class Vim")
-                WinActivate("ahk_class Vim")
-                WinWaitActive("ahk_class Vim")
-                ;检查多进程 TODO 原因？？
-                objPid := map()
-                for hwnd in WinGetList("ahk_class Vim")
-                    objPid[WinGetPID("ahk_id " . hwnd)] := 1
-                if (objPid.count > 1)
-                    msgbox("注意：gvim 有两个进程",,0x40000)
+                hyf_runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name))
+                OutputDebug(format("i#{1} {2}", A_LineFile,A_LineNumber))
             }
         }
         doGlobal_Repeat() {
@@ -998,6 +982,12 @@ class vimd {
                 res .= format("{1}`n", k)
             msgbox(res,,0x40000)
         }
+        doGlobal_Debug_objFunDynamic() {
+            res := ""
+            for k, arr in this.objFunDynamic
+                res .= format("{1}`n", k)
+            msgbox(res,,0x40000)
+        }
         doGlobal_Debug_arrHistory() {
             res := ""
             for arr in this.win.arrHistory
@@ -1013,9 +1003,7 @@ class vimd {
         }
 
         showTips(arrMatch) {
-            OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
-            ;this.strCache := this.getStrCache()
-            OutputDebug(format("i#{1} {2}:this.strCache={3},this.keyDebug={4}", A_LineFile,A_LineNumber,this.strCache,this.win.keyDebug))
+            OutputDebug(format("i#{1} {2}:{3} this.strCache={4}", A_LineFile,A_LineNumber,A_ThisFunc,this.strCache))
             strTooltip := this.objTips.has(this.strCache)
                 ? format("{1}`t{2}", this.strCache,this.objTips[this.strCache])
                 : this.strCache
