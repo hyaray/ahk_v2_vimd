@@ -411,9 +411,14 @@ class vimd {
 
         ;临时把 count 当值使用(默认是执行 count 次功能)
         ;方便插件调用
-        setRepeatDo(cntDefault:=1) {
+        setBreak(cntDefault:=1) {
             this.isBreak := true
-            return this.GetCount(cntDefault)
+            if (this.isRepeat)
+                cnt := this.lastAction[2]
+            else
+                cnt := this.GetCount(cntDefault)
+            OutputDebug(format("i#{1} {2}:setBreak cnt={3}", A_LineFile,A_LineNumber,cnt))
+            return cnt
         }
 
         GetCount(cntDefault:=1) { ;执行时用(默认返回1，而用count属性默认为0)
@@ -497,20 +502,20 @@ class vimd {
             this.objHotIfWins := map() ;记录当前子窗口的关联窗口名
         }
 
-        ;脚本运行过程出错，要先运行此命令退出，否则下次按键会无效(TODO 具体原因)
+        ;脚本运行过程出错，要先运行此命令退出，否则下次按键会因为 arrKeymapPressed 误判(往往使下一按键无效)
         ;NOTE 执行命令或中途退出才执行
-        init(done:=true, noTips:=true) { ;默认隐藏 tooltip
+        ;tp -1=执行前半段 0=全部执行 1=执行后半段
+        init(tp:=0) {
             OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
-            ;自身属性
-            this.arrKeymapPressed := [] ;记录每个按键
-            this.tipsDynamic := ""
-            if (this.win.typeSuperVim)
-                this.win.exitSuperMode()
-            vimd.hideTips1()
-            if (noTips)
+            if (tp <= 0) { ;用于在do之前先初始化一部分
+                this.arrKeymapPressed := [] ;记录每个按键
+                this.tipsDynamic := ""
+                if (this.win.typeSuperVim)
+                    this.win.exitSuperMode()
+                vimd.hideTips1()
                 vimd.hideTips()
-            if (done) {
-                ;win 属性
+            }
+            if (tp >= 0) { ;影响执行逻辑的属性
                 this.win.count := 0
                 this.win.isRepeat := false
                 this.win.isBreak := false
@@ -571,14 +576,17 @@ class vimd {
                     OutputDebug(format("i#{1} {2}:this.objKeysmap.has({3}) comment={4}", A_LineFile,A_LineNumber,keyMap,this.objKeysmap[keyMap]["comment"]))
                     if (keyMap ~= "^\d$") {
                         this.dealCount(integer(keyMap)) ;因为要传入参数，所以单独处理
+                    } else if (keyMap == "{BackSpace}") {
+                        this.doGlobal_BackSpace() ;因为无需 init，所以单独处理
                     } else if (keyMap == ".") {
                         this.doGlobal_Repeat() ;一般是 do(objDo["action"], this.win.GetCount())，repeat 刚好相反
                         this.init()
                     } else {
-                        this.strCache := this.objKeysmap[keyMap]["string"]
+                        ;this.strCache := this.objKeysmap[keyMap]["string"]
                         ;OutputDebug(format("i#{1} {2}:comment={3}", A_LineFile,A_LineNumber,this.objKeysmap[keyMap]["comment"]))
-                        this.do(this.objKeysmap[keyMap]["action"], this.win.GetCount())
-                        this.init()
+                        this.init(-1)
+                        this.do(this.objKeysmap[keyMap]["action"], this.win.GetCount(), this.objKeysmap[keyMap]["comment"])
+                        this.init(1)
                     }
                     exit
                 } else {
@@ -591,7 +599,6 @@ class vimd {
                 }
             } else {
                 this.update(keyMap)
-                return
             }
         }
 
@@ -613,8 +620,6 @@ class vimd {
             this.strCache := this.getStrCache()
             OutputDebug(format("i#{1} {2}:this.strCache={3}", A_LineFile,A_LineNumber,this.strCache))
             ;匹配动态命令
-            if (keyMap == "\")
-                this.addTipsDynamic(this.name)
             ;   命令列表是在第1个键动态生成，后续按键需要动态更新
             for objDo in this.arrListDynamic {
                 if (instr(objDo["string"],this.strCache,true) == 1)
@@ -631,10 +636,10 @@ class vimd {
                     send(this.arrKeymapPressed[1])
                 this.init()
             } else if (arrMatch.length == 1) { ;单个结果
-                ;msgbox(json.stringify(arrMatch[1], 4))
-                this.strCache := arrMatch[1]["string"]
-                this.do(arrMatch[1]["action"], this.win.GetCount())
-                this.init()
+                ;this.strCache := arrMatch[1]["string"]
+                this.init(-1)
+                this.do(arrMatch[1]["action"], this.win.GetCount(), arrMatch[1]["comment"])
+                this.init(1)
             } else { ;大部分情况
                 this.showTips(arrMatch)
             }
@@ -656,6 +661,7 @@ class vimd {
             if (keyMap == "{BackSpace}") {
                 if (this.win.count > 9) { ;两位数
                     this.win.count := this.win.count//10
+                    OutputDebug(format("i#{1} {2}:this.win.count={3}", A_LineFile,A_LineNumber,this.win.count))
                 } else {
                     this.init()
                     return
@@ -798,7 +804,7 @@ class vimd {
 
         ;-----------------------------------do__-----------------------------------
         beforeKey(p*) {
-            return !CaretGetPos()
+            return !CaretGetPos() ;有些软件要用 UIA.GetFocusedElement().CurrentControlType != UIA.ControlType.Edit
         }
 
         ;doSend(key) {
@@ -811,19 +817,21 @@ class vimd {
         ;最终执行的命令
         ;因为 doGlobal_Repeat 调用，所以把 cnt 放参数
         ;为什么第一个参数不用 objDo
-        do(varDo, cnt) {
+        do(varDo, cnt, comment:=unset) {
             vimd.hideTips()
             ;处理 repeat 和 count
             if (!this.win.isRepeat) {
-                this.win.LastAction := [varDo, cnt, this.strCache]
-                this.win.arrHistory.push(this.win.LastAction)
+                this.win.lastAction := [varDo, cnt, comment] ;this.strCache
+                this.win.arrHistory.push(this.win.lastAction)
             }
             ;timeSave := A_TickCount
             ;NOTE 运行
             loop(cnt) {
                 this.callFunc(varDo, true)
-                if (this.win.isBreak) ;运行后才知道是否 isBreak
+                if (this.win.isBreak) { ;运行后才知道是否 isBreak
+                    OutputDebug(format("d#{1} {2}:break", A_LineFile,A_LineNumber))
                     break
+                }
             }
             ;tooltip(A_TickCount - timeSave,,, 9)
             ;SetTimer(tooltip.bind(,,, 9), -1000)
@@ -900,9 +908,12 @@ class vimd {
 
         ;删除最后一个字符
         doGlobal_BackSpace() {
+            this.win.isBreak := true
             if (this.arrKeymapPressed.length) {
+                OutputDebug(format("i#{1} {2}:update", A_LineFile,A_LineNumber))
                 this.update()
             } else if (this.win.count) {
+                OutputDebug(format("i#{1} {2}:dealCount", A_LineFile,A_LineNumber))
                 this.dealCount("{BackSpace}")
             } else {
                 send("{BackSpace}")
@@ -923,7 +934,8 @@ class vimd {
             this.win.isRepeat := true
             if (this.win.count)
                 this.win.lastAction[2] := this.win.GetCount() ;覆盖 lastAction 的count
-            this.do(this.win.lastAction[1], this.win.lastAction[2])
+            OutputDebug(format("i#{1} {2}:do repeat={3} cnt={4}", A_LineFile,A_LineNumber,this.win.lastAction[3],this.win.lastAction[2]))
+            this.do(this.win.lastAction*)
             this.win.isRepeat := false
         }
         doGlobal_Up() {
