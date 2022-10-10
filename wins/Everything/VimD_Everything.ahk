@@ -61,13 +61,13 @@
 ;ctrl-b 全字
 */
 
-class VimD_Everything extends _ET {
+class vimd_Everything extends _ET {
 
     static __new() {
-        if (this != VimD_Everything)
+        if (this != vimd_Everything)
             return
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
-        this.mode1 := this.win.initMode(1, true, true)
+        this.mode1 := this.win.initMode(1,, true)
         this.win.setKeySuperVim()
 
         ;hotkey("F4", (p*)=>_ET.smartDo())
@@ -75,21 +75,21 @@ class VimD_Everything extends _ET {
         this.mode1.setObjHotWin("ahk_class EVERYTHING")
 
         this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
-        this.mode1.mapkey("b",(p*)=>VimD_Everything.compare(),"比较")
+        this.mode1.mapkey("b",(p*)=>vimd_Everything.compare(),"比较")
         this.mode1.mapkey("<super>{F5}{F5}",(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
         this.mode1.mapkey("<super>{F5}f",(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
         this.mode1.mapkey("<super>{F5}d",(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
         this.mode1.mapkey("<super>{F5}e",(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
         this.mode1.mapkey("<super>{F5}i",(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
         this.mode1.mapkey("<super>{F5}r",(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
-        this.mode1.mapkey("<super>{F5}1",(p*)=>VimD_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
+        this.mode1.mapkey("<super>{F5}1",(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
 
-        ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(VimD_Everything.currentFilePath()),"vim打开")
-        this.mode1.mapkey("r",(p*)=>run(VimD_Everything.currentFilePath()),"run")
-        this.mode1.mapkey("<super>{F12}{F12}",(p*)=>VimD_Everything.openOption(),"打开配置")
-        this.mode1.mapkey("<super>{F12}k",(p*)=>VimD_Everything.openOption("常规\快捷键"),"配置-快捷键")
-        this.mode1.mapkey("<super>{F12}i",(p*)=>VimD_Everything.openOption("索引\排除列表"),"配置-排除列表")
-        this.mode1.mapkey("<super>{F12}u",ObjBindMethod(VimD_Everything,"update"),"更新")
+        ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
+        this.mode1.mapkey("r",(p*)=>run(vimd_Everything.currentFilePath()),"run")
+        this.mode1.mapkey("<super>{F12}{F12}",(p*)=>vimd_Everything.openOption(),"打开配置")
+        this.mode1.mapkey("<super>{F12}k",(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
+        this.mode1.mapkey("<super>{F12}i",(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
+        this.mode1.mapkey("<super>{F12}u",ObjBindMethod(vimd_Everything,"update"),"更新")
     }
 
     static update() {
@@ -102,7 +102,7 @@ class VimD_Everything extends _ET {
         if (0) {
             run(format('{1} /exclude_list_enabled=1', _ET.spath))
         } else {
-            VimD_Everything.openOption("索引\排除列表")
+            vimd_Everything.openOption("索引\排除列表")
             send("{alt down}e{alt up}")
         }
     }

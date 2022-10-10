@@ -10,7 +10,7 @@
 ;   支持子窗口管理：各子窗口相对独立，但能在 initWin 后指定数组[hotwin1, hotwin2]，表明和其共用热键
 ;   像TC里，比如按了d后，是不希望执行vimd功能的
 ;   在Cmder里，git界面不想显示其他命令，在cmd界面，想显示git命令
-;插件配制：见 wins\Notepad\VimD_Notepad.ahk
+;插件配制：见 wins\Notepad\vimd_Notepad.ahk
 ;NOTE 注意有两个阶段
 ;   1. 【定义】热键: mapkey mapDynamic
 ;   2. 【触发】热键: keyIn 进行各种获取和判断
@@ -249,7 +249,7 @@ class vimd {
             f := FileOpen(fp, "w", "utf-8-raw")
             strInclude := ""
             loop files, format("{1}\wins\*",A_LineFile.dir()), "D"
-                strInclude .=  format("#include wins\{1}\VimD_{1}.ahk`n",A_LoopFileName)
+                strInclude .=  format("#include wins\{1}\vimd_{1}.ahk`n",A_LoopFileName)
             f.write(strInclude)
             f.close()
             return
@@ -300,7 +300,7 @@ class vimd {
         ;默认的模式放最后定义，或者最后加上 win.changeMode(i)
         ;NOTE 必须先 initMode(0) 再 initMode(1)
         ;NOTE 必须先 setHotIf
-        initMode(idx, bCount:=true, funOnBeforeKey:=false, modename:="") {
+        initMode(idx, mapCountAndRepeat:="11", funOnBeforeKey:=false, modename:="") {
             if (this.currentHotIfWin == "")
                 throw ValueError('request "setHotIf" done')
             ;mode0 未定义，则自动定义
@@ -313,7 +313,7 @@ class vimd {
                 this.arrMode[idx] := this.currentMode
             ;NOTE 在这里直接定义 initWin 时设置的 currentHotIfWin
             this.currentMode.objHotIfWin_FirstKey[this.currentHotIfWin] := map()
-            this.currentMode.mapDefault(bCount)
+            this.currentMode.mapDefault(mapCountAndRepeat)
             if (funOnBeforeKey)
                 this.currentMode.onBeforeKey := isobject(funOnBeforeKey) ? funOnBeforeKey : ObjBindMethod(this.currentMode,"beforeKey")
             return this.currentMode
@@ -441,7 +441,7 @@ class vimd {
         ;NOTE 由 vimdWins 对象接收按键并调度
         ;这里只处理特殊情况
         ;由 _keyIn() 处理后续细节
-        ;byScript 非手工按键，而是用脚本触发时，需要传入此参数，如 VimD_WeChat.win.keyIn("F3", "ahk_exe WeChat.exe")
+        ;byScript 非手工按键，而是用脚本触发时，需要传入此参数，如 vimd_WeChat.win.keyIn("F3", "ahk_exe WeChat.exe")
         keyIn(ThisHotkey, byScript:=0) {
             keyMap := vimd.key_hot2map(ThisHotkey)
             ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------start", A_LineFile,A_LineNumber,A_ThisFunc))
@@ -531,6 +531,10 @@ class vimd {
         }
 
         setDynamic(key, objFun) {
+            if instr(key, "<super>") {
+                key := StrReplace(key, "<super>")
+                this.win.objKeySuperVim[key] := 1
+            }
             this.objFunDynamic[key] := objFun
             this._map(key) ;NOTE 定义的时候必须要确保 key 在拦截清单内
         }
@@ -691,17 +695,18 @@ class vimd {
         objDo["super"] := super ;热键永远 on(无视模式)，直接用 hotkey()定义即可
         */
         ;公共 map
-        mapDefault(bCount:=true) {
+        mapDefault(mapCountAndRepeat) {
             if (this.index == 0) { ;mode0
                 this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"进入 mode1")
             } else if (this.index == 1) { ;mode1
                 this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"escape")
                 this.mapkey("{BackSpace}",ObjBindMethod(this,"doGlobal_BackSpace"),"BackSpace")
                 ;由于这次模式还没生成，如果这两个键定义在 win 的属性
-                this.mapkey(this.win.keyToMode0,ObjBindMethod(this.win,"changeMode",0),"进入 mode0")
+                if (this.win.keyToMode0 != "")
+                    this.mapkey(this.win.keyToMode0,ObjBindMethod(this.win,"changeMode",0),"进入 mode0")
                 ;NOTE 定义debug的内置功能，自带 <super> 参数
                 keymapDebug := format("<super>{1}", this.win.keyDebug)
-                this.mapkey(keymapDebug . keymapDebug,ObjBindMethod(this,"doGlobal_Edit"),"【编辑】VimD_" . this.win.name)
+                this.mapkey(keymapDebug . keymapDebug,ObjBindMethod(this,"doGlobal_Edit"),"【编辑】vimd_" . this.win.name)
                 this.mapkey(keymapDebug . "[",ObjBindMethod(this,"doGlobal_objByFirstKey"),"查看所有功能(按窗口和首键分组)objHotIfWin_FirstKey")
                 this.mapkey(keymapDebug . "]",ObjBindMethod(this,"doGlobal_objKeysmap"),"查看所有功能(按keymap分组)objKeysmap")
                 this.mapkey(keymapDebug . "=",ObjBindMethod(this,"doGlobal_objHotIfWins"),"查看所有窗口关系objHotIfWins")
@@ -709,9 +714,10 @@ class vimd {
                 this.mapkey(keymapDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
                 this.mapkey(keymapDebug . "\",ObjBindMethod(this,"doGlobal_Debug_objFunDynamic"),"查看所有的<super>键 objFunDynamic")
                 this.mapkey(keymapDebug . "/",ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
-                if (bCount)
+                if (substr(mapCountAndRepeat,1,1) == "1")
                     this.mapCount()
-                this.mapkey("." ,"","重做")
+                if (substr(mapCountAndRepeat,2,1) == "1")
+                    this.mapkey("." ,"","重做")
             }
         }
         mapCount() {
@@ -923,10 +929,10 @@ class vimd {
             SplitPath(A_LineFile,, &dn)
             if (this.win.HasOwnProp("cls") && this.win.cls.HasOwnProp("getTitleEx")) {
                 title := this.win.cls.getTitleEx()
-                hyf_runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name), title)
+                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name), title)
                 OutputDebug(format("i#{1} {2}:title={3}", A_LineFile,A_LineNumber,title))
             } else {
-                hyf_runByVim(format("{1}\wins\{2}\VimD_{2}.ahk",dn,this.win.name))
+                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name))
                 OutputDebug(format("i#{1} {2}", A_LineFile,A_LineNumber))
             }
         }
