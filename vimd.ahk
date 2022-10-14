@@ -300,7 +300,8 @@ class vimd {
         ;默认的模式放最后定义，或者最后加上 win.changeMode(i)
         ;NOTE 必须先 initMode(0) 再 initMode(1)
         ;NOTE 必须先 setHotIf
-        initMode(idx, mapCountAndRepeat:="11", funOnBeforeKey:=false, modename:="") {
+        ;binMap(二进制理解) 0=none 1=count 2=repeat 3=both
+        initMode(idx, binMap:="11", funOnBeforeKey:=false, modename:="") {
             if (this.currentHotIfWin == "")
                 throw ValueError('request "setHotIf" done')
             ;mode0 未定义，则自动定义
@@ -313,7 +314,7 @@ class vimd {
                 this.arrMode[idx] := this.currentMode
             ;NOTE 在这里直接定义 initWin 时设置的 currentHotIfWin
             this.currentMode.objHotIfWin_FirstKey[this.currentHotIfWin] := map()
-            this.currentMode.mapDefault(mapCountAndRepeat)
+            this.currentMode.mapDefault(binMap)
             if (funOnBeforeKey)
                 this.currentMode.onBeforeKey := isobject(funOnBeforeKey) ? funOnBeforeKey : ObjBindMethod(this.currentMode,"beforeKey")
             return this.currentMode
@@ -695,7 +696,7 @@ class vimd {
         objDo["super"] := super ;热键永远 on(无视模式)，直接用 hotkey()定义即可
         */
         ;公共 map
-        mapDefault(mapCountAndRepeat) {
+        mapDefault(binMap) {
             if (this.index == 0) { ;mode0
                 this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"进入 mode1")
             } else if (this.index == 1) { ;mode1
@@ -714,9 +715,11 @@ class vimd {
                 this.mapkey(keymapDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
                 this.mapkey(keymapDebug . "\",ObjBindMethod(this,"doGlobal_Debug_objFunDynamic"),"查看所有的<super>键 objFunDynamic")
                 this.mapkey(keymapDebug . "/",ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
-                if (substr(mapCountAndRepeat,1,1) == "1")
+                n := 0 ;二进制的位数(从右开始)
+                if ((binMap & 2**n) >> n) ;也可以用 "10" 这种字符串来判断
                     this.mapCount()
-                if (substr(mapCountAndRepeat,2,1) == "1")
+                n++
+                if ((binMap & 2**n) >> n)
                     this.mapkey("." ,"","重做")
             }
         }
