@@ -61,11 +61,10 @@
 ;ctrl-b 全字
 */
 
+vimd_Everything.init()
 class vimd_Everything extends _ET {
 
-    static __new() {
-        if (this != vimd_Everything)
-            return
+    static init() {
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
         this.mode1 := this.win.initMode(1,, true)
         this.win.setKeySuperVim()
@@ -86,6 +85,7 @@ class vimd_Everything extends _ET {
 
         ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
         this.mode1.mapkey("r",(p*)=>run(vimd_Everything.currentFilePath()),"run")
+        this.mode1.mapkey("<super>{F4}",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"run")
         this.mode1.mapkey("<super>{F12}{F12}",(p*)=>vimd_Everything.openOption(),"打开配置")
         this.mode1.mapkey("<super>{F12}k",(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
         this.mode1.mapkey("<super>{F12}i",(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
@@ -107,9 +107,7 @@ class vimd_Everything extends _ET {
         }
     }
 
-    static post(n) {
-        PostMessage(0x111, n,,, "ahk_class EVERYTHING")
-    }
+    static post(n) => PostMessage(0x111, n,,, "ahk_class EVERYTHING")
 
     static openOption(item:="") {
         this.post(40074)
@@ -125,9 +123,7 @@ class vimd_Everything extends _ET {
         msgbox("1、查看选项→索引→NTFS，确认所有分区都【包含到数据库】`n2、如果断电，硬盘的数据可能有缺失，对硬盘所有文件右键属性，让它重新遍历文件数")
     }
 
-    static setFilter(item) {
-        ControlChooseString(item, "ComboBox1", "A")
-    }
+    static setFilter(item) => ControlChooseString(item, "ComboBox1", "A")
 
     ;static arrSelect() {
     ;    return StrSplit(ListViewGetContent("Selected", "SysListView321", "ahk_class EVERYTHING"), "`n", "`r")
@@ -221,25 +217,25 @@ class _ET {
             WinHide(winTitle)
             if (allWin) {
                 for hwnd in WinGetList(winTitle)
-                    WinHide("ahk_id " . hwnd)
+                    WinHide(hwnd)
             }
             ;激活鼠标所在窗口 TODO
             MouseGetPos(,, &idMouse)
-            WinActivate("ahk_id " . idMouse)
+            WinActivate(idMouse)
         } else { ;NOTE
             arrHwnd := hyf_hwnds(winTitle, funcHwndOrwinClass)
             if (allWin) { ;激活所有匹配窗口(比如开了多个谷歌浏览器)
                 for v in arrHwnd {
-                    WinShow("ahk_id " . v)
-                    WinActivate("ahk_id " . v)
+                    WinShow(v)
+                    WinActivate(v)
                     idWin := v
                 }
-                WinActivate("ahk_id " . idWin)
+                WinActivate(idWin)
             } else {
                 if (arrHwnd.length) {
                     idWin := arrHwnd[1]
-                    WinShow("ahk_id " . idWin)
-                    WinActivate("ahk_id " . idWin)
+                    WinShow(idWin)
+                    WinActivate(idWin)
                 } else {
                     tooltip("找不到窗口，从激活改成【打开】")
                     smartRun()
@@ -439,9 +435,7 @@ class _ET {
     }
 
     ;搜索扩展名最新文件
-    static searchExtNewFile(ext) {
-        run(format("{1} -sort-descending -search *.{2}", this.spath,ext))
-    }
+    static searchExtNewFile(ext) => run(format("{1} -sort-descending -search *.{2}", this.spath,ext))
 
     ;NOTE 返回arr
     ;获取文件夹最新的cnt个项目路径数组
@@ -475,7 +469,7 @@ class _ET {
         if (WinActive("ahk_class EVERYTHING")) {
             WinHide
             MouseGetPos(,, &idA)
-            WinActivate("ahk_id " . idA)
+            WinActivate(idA)
         } else if (sSearch != "") {
             if (sSearch.isabs() || (sSearch ~= "^\\\\"))
                 run(format('{1} -search "{2}"', _ET.spath,sSearch.noExt()))
@@ -499,7 +493,7 @@ class _ET {
             numput("UPtr", 2, cds)
             numput("UPtr", size, cds, A_PtrSize)
             numput("UPtr", query.ptr, cds, A_PtrSize*2)
-            SendMessage(0x4A, hwnd, &cds,, "ahk_id " . idEv)
+            SendMessage(0x4A, hwnd, &cds,, idEv)
             ;if errorlevel != FAIL
             ;return 1
         } else
@@ -510,13 +504,12 @@ class _ET {
     static version(a) {
         idEv := WinExist("ahk_class EVERYTHING_TASKBAR_NOTIFICATION")
         if (idEv)
-            return SendMessage(0x400, a,,, "ahk_id " . idEv)
-
+            return SendMessage(0x400, a,,, idEv)
     }
 
     static searchMode() { ;[Everything 区分大小写]
         obj := map(
-	"大小写","case,",
+            "大小写","case,",
             "正则","RegEx,",
             "文件名","wfn,",
 	    )
@@ -525,8 +518,9 @@ class _ET {
         if (instr(str_EvEdit1, "case:")) {
             str_EvEdit1 := StrReplace(str_EvEdit1, "case:")
             ControlSetText(str_EvEdit1, "Edit1", "A")
-        } else
+        } else {
             ControlSetText("case:" . str_EvEdit1, "Edit1", "A")
+        }
         send("{end}")
         return
     }

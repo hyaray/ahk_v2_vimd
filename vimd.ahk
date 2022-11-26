@@ -59,16 +59,12 @@ class vimd {
     }
 
     static hideTips() {
-        tooltip(,,, this.tipLevel)
+        ;OutputDebug(format("i#{1} {2}:hideTips", A_LineFile,A_LineNumber))
+        btt(,,, vimd.tipLevel)
     }
 
-    static hideTips1() {
-        tooltip(,,, this.tipLevel1)
-    }
-
-    static showTips1(str, x:=0, y:=0) { ;辅助显示，固定在某区域
-        tooltip(str, x, y, this.tipLevel1)
-    }
+    static hideTips1() => tooltip(,,, vimd.tipLevel1)
+    static showTips1(str, x:=0, y:=0) => tooltip(str, x, y, vimd.tipLevel1) ;辅助显示，固定在某区域
 
     ;-----------------------------------key__-----------------------------------
     /*
@@ -289,7 +285,8 @@ class vimd {
             this.onBeforeHideTip := ""
             ;搭配 keySuperVim 使用
             this.keySuperVim := ""
-            this.keyToMode0 := "``"
+            this.keyToMode0 := "``" ;如果设置为空，则永远是vim模式，比如在gvim里
+            this.keyToMode1 := "{escape}" ;如果设置为空，则永远是mode0模式，只用<super>键功能
             this.keyDebug := "{F10}" ;用得较少 {F12}一般用在配置文件
             this.typeSuperVim := 0 ;1=只切换 2=切换并执行按键
             this.objKeySuperVim := map() ;记录超级按键，比 keySuperVim 多了个生效当前按键功能
@@ -301,17 +298,17 @@ class vimd {
         ;NOTE 必须先 initMode(0) 再 initMode(1)
         ;NOTE 必须先 setHotIf
         ;binMap(二进制理解) 0=none 1=count 2=repeat 3=both
-        initMode(idx, binMap:="11", funOnBeforeKey:=false, modename:="") {
+        initMode(idx, binMap:=3, funOnBeforeKey:=false, modename:="") {
             if (this.currentHotIfWin == "")
                 throw ValueError('request "setHotIf" done')
             ;mode0 未定义，则自动定义
             if (idx == 1 && this.arrMode.length == 0)
                 this.initMode(0)
-            this.currentMode := vimd.vimdModes(idx, this, modename)
+            this.currentMode := vimd.vimdModes(idx, this, modename) ;modename 用来修改内置模式名
             if (this.arrMode.length < idx+1)
                 this.arrMode.push(this.currentMode)
             else
-                this.arrMode[idx] := this.currentMode
+                this.arrMode[idx+1] := this.currentMode
             ;NOTE 在这里直接定义 initWin 时设置的 currentHotIfWin
             this.currentMode.objHotIfWin_FirstKey[this.currentHotIfWin] := map()
             this.currentMode.mapDefault(binMap)
@@ -326,13 +323,11 @@ class vimd {
             else
                 return this.arrMode[i+1]
         }
-        setMode(i) {
-            return this.currentMode := this.getMode(i)
-        }
+        setMode(i) => this.currentMode := this.getMode(i)
 
         getArrWinMatch(winTitle, pushself:=false) {
-            OutputDebug("-----------------------------------arrTitle-----------------------------------")
-            OutputDebug(format("d#{1} {2}:{3} winTitle={4}", A_LineFile,A_LineNumber,A_ThisFunc,winTitle))
+            ;OutputDebug("-----------------------------------arrTitle-----------------------------------")
+            ;OutputDebug(format("d#{1} {2}:{3} winTitle={4}", A_LineFile,A_LineNumber,A_ThisFunc,winTitle))
             hwnd := WinExist(winTitle)
             if (hwnd == 0)
                 throw TargetError(winTitle)
@@ -422,9 +417,7 @@ class vimd {
             return cnt
         }
 
-        GetCount(cntDefault:=1) { ;执行时用(默认返回1，而用count属性默认为0)
-            return this.count ? this.count : cntDefault
-        }
+        GetCount(cntDefault:=1) => this.count ? this.count : cntDefault ;执行时用(默认返回1，而用count属性默认为0)
 
         ;设置currentMode，不存在会自动new
         ;由于会触发事件，所以不能在初始化时使用，很可能找不到窗口出错
@@ -507,7 +500,7 @@ class vimd {
         ;NOTE 执行命令或中途退出才执行
         ;tp -1=执行前半段 0=全部执行 1=执行后半段
         init(tp:=0) {
-            OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
+            ;OutputDebug(format("i#{1} {2}:init tp={3}", A_LineFile,A_LineNumber,tp))
             if (tp <= 0) { ;用于在do之前先初始化一部分
                 this.arrKeymapPressed := [] ;记录每个按键
                 this.tipsDynamic := ""
@@ -574,18 +567,19 @@ class vimd {
                     this.objFunDynamic[keyMap].call()
                     OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
                 } else {
-                    OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
+                    ;OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
                 }
                 ;非常规功能
                 if (this.objKeysmap.has(keyMap)) { ;单键功能
-                    OutputDebug(format("i#{1} {2}:this.objKeysmap.has({3}) comment={4}", A_LineFile,A_LineNumber,keyMap,this.objKeysmap[keyMap]["comment"]))
+                    ;OutputDebug(format("i#{1} {2}:this.objKeysmap.has({3}) comment={4}", A_LineFile,A_LineNumber,keyMap,this.objKeysmap[keyMap]["comment"]))
                     if (keyMap ~= "^\d$") {
                         this.dealCount(integer(keyMap)) ;因为要传入参数，所以单独处理
                     } else if (keyMap == "{BackSpace}") {
                         this.doGlobal_BackSpace() ;因为无需 init，所以单独处理
                     } else if (keyMap == ".") {
+                        this.init(-1)
                         this.doGlobal_Repeat() ;一般是 do(objDo["action"], this.win.GetCount())，repeat 刚好相反
-                        this.init()
+                        this.init(1)
                     } else {
                         ;this.strCache := this.objKeysmap[keyMap]["string"]
                         ;OutputDebug(format("i#{1} {2}:comment={3}", A_LineFile,A_LineNumber,this.objKeysmap[keyMap]["comment"]))
@@ -595,7 +589,7 @@ class vimd {
                     }
                     exit
                 } else {
-                    OutputDebug(format("d#{1} {2}:this.objKeysmap.not has({3}) index={4}", A_LineFile,A_LineNumber,keyMap,this.index))
+                    ;OutputDebug(format("d#{1} {2}:this.objKeysmap.not has({3}) index={4}", A_LineFile,A_LineNumber,keyMap,this.index))
                     if (this.index == 0) {
                         send(vimd.key_map2send(keyMap))
                     } else {
@@ -698,7 +692,8 @@ class vimd {
         ;公共 map
         mapDefault(binMap) {
             if (this.index == 0) { ;mode0
-                this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"进入 mode1")
+                if (this.win.keyToMode1 != "")
+                    this.mapkey(this.win.keyToMode1,ObjBindMethod(this,"doGlobal_Escape"),"进入 mode1")
             } else if (this.index == 1) { ;mode1
                 this.mapkey("{escape}",ObjBindMethod(this,"doGlobal_Escape"),"escape")
                 this.mapkey("{BackSpace}",ObjBindMethod(this,"doGlobal_BackSpace"),"BackSpace")
@@ -812,9 +807,7 @@ class vimd {
         ;}
 
         ;-----------------------------------do__-----------------------------------
-        beforeKey(p*) {
-            return !CaretGetPos() ;有些软件要用 UIA.GetFocusedElement().CurrentControlType != UIA.ControlType.Edit
-        }
+        beforeKey(p*) => !CaretGetPos() ;有些软件要用 UIA.GetFocusedElement().CurrentControlType != UIA.ControlType.Edit
 
         ;doSend(key) {
         ;    if GetKeyState("CapsLock")
@@ -827,7 +820,6 @@ class vimd {
         ;因为 doGlobal_Repeat 调用，所以把 cnt 放参数
         ;为什么第一个参数不用 objDo
         do(varDo, cnt, comment:=unset) {
-            vimd.hideTips()
             ;处理 repeat 和 count
             if (!this.win.isRepeat) {
                 this.win.lastAction := [varDo, cnt, comment] ;this.strCache
@@ -947,18 +939,10 @@ class vimd {
             this.do(this.win.lastAction*)
             this.win.isRepeat := false
         }
-        doGlobal_Up() {
-            send("{up}")
-        }
-        doGlobal_Down() {
-            send("{down}")
-        }
-        doGlobal_Left() {
-            send("{left}")
-        }
-        doGlobal_Right() {
-            send("{right}")
-        }
+        doGlobal_Up() => send("{up}")
+        doGlobal_Down() => send("{down}")
+        doGlobal_Left() => send("{left}")
+        doGlobal_Right() => send("{right}")
         doGlobal_objKeysmap() {
             ;msgbox(this.name . "`n" . this.index)
             res := ""
@@ -986,9 +970,7 @@ class vimd {
             }
             msgbox(res,,0x40000)
         }
-        doGlobal_objHotIfWins() {
-            msgbox(json.stringify(this.objHotIfWins, 4))
-        }
+        doGlobal_objHotIfWins() => msgbox(json.stringify(this.objHotIfWins, 4))
         doGlobal_Debug_objSingleKey() {
             res := ""
             for winTitle, obj in this.win.objHotIfWin_SingleKey {
@@ -1019,9 +1001,7 @@ class vimd {
         ;-----------------------------------tip-----------------------------------
 
         ;添加动态提示内容
-        addTipsDynamic(str) {
-            this.tipsDynamic .= "`t" . str
-        }
+        addTipsDynamic(str) => this.tipsDynamic .= "`t" . str
 
         showTips(arrMatch) {
             OutputDebug(format("i#{1} {2}:{3} this.strCache={4}", A_LineFile,A_LineNumber,A_ThisFunc,this.strCache))
@@ -1037,17 +1017,20 @@ class vimd {
 
         ;NOTE
         _show(str) {
+            ;OutputDebug(format("i#{1} {2}:isobject={3} _show str={4}", A_LineFile,A_LineNumber,isobject(this.win.funTipsCoordinate),str))
             if (isobject(this.win.funTipsCoordinate)) {
                 cmToolTip := A_CoordModeToolTip
                 CoordMode("ToolTip", "window") ;强制为 window 模式
                 arrXY := this.win.funTipsCoordinate.call()
-                tooltip(str, arrXY[1], arrXY[2], vimd.tipLevel)
+                ;OutputDebug(format("i#{1} {2}:arrXY={3}", A_LineFile,A_LineNumber,json.stringify(arrXY)))
+                btt(str, arrXY[1], arrXY[2], vimd.tipLevel)
+                ;OutputDebug(format("i#{1} {2}:after btt", A_LineFile,A_LineNumber))
                 CoordMode("ToolTip", cmToolTip)
             } else {
                 MouseGetPos(&x, &y)
                 x += 40
                 y += 40
-                tooltip(str, x, y, vimd.tipLevel)
+                btt(str, x, y, vimd.tipLevel)
             }
         }
 
