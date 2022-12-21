@@ -357,7 +357,8 @@ class vimd {
         }
 
         ;指定后面热键的窗口(大部分是针对ahk_class的)
-        ;NOTE bAsHotIfWin 如果全为true，则会存在抢热键的情况，单个键只能在一个窗口生效，【先定义】的 HotIfWin 优先，所以要考虑兼容性问题
+        ;NOTE bAsHotIfWin 推荐 false
+        ;   如果全为true，则会存在抢热键的情况，单个键只能在一个窗口生效，【先定义】的 HotIfWin 优先，所以要考虑兼容性问题
         ;   如果为 false，热键仍然生效，菜单仍会出现，可根据 objHotIfWins[winTitle] 的数组自由组合
         ;vimd.initWin 内容较多，这是纯净版
         setHotIf(winTitle, bAsHotIfWin:=true) {
@@ -612,6 +613,9 @@ class vimd {
                     this.init()
                     return
                 }
+            } else if (keyMap == "{escape}") {
+                this.init()
+                return
             } else {
                 this.arrKeymapPressed.push(keyMap)
             }
@@ -631,9 +635,12 @@ class vimd {
                 arrThis := addByWinTitle(winTitle)
             OutputDebug(format("i#{1} {2}:last arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
             if (!arrMatch.length) { ;没找到命令
-                if (this.arrKeymapPressed.length == 1) ;为第1个按键
+                if (this.arrKeymapPressed.length == 1) { ;为第1个按键
                     send(this.arrKeymapPressed[1])
-                this.init()
+                    this.init()
+                } else { ;TODO 按错了，是否忽略
+                    this.arrKeymapPressed.pop()
+                }
             } else if (arrMatch.length == 1) { ;单个结果
                 ;this.strCache := arrMatch[1]["string"]
                 this.init(-1)
@@ -848,7 +855,7 @@ class vimd {
                 return 1
             }
             try {
-                if (type(%funcObj%) ~= "^(ObjBindMethod|Closure|BoundFunc|Func)$") {
+                if (type(%funcObj%).isFunc()) {
                     %funcObj%()
                     return 1
                 }

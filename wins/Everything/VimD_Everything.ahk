@@ -1,67 +1,4 @@
-﻿/*
-;命令行
-;   -instance "Http Server"
-;   -search *.xls
-;   -sort "Date Modified"
-;   -sort "Date Modified"
-;   -sort-descending ;降序(默认记住上次选择)
-;   -sort-ascending ;升序
-;   常用
-;       -search *.xls? -sort-descending
-;各种参数：
-;    排序
-;    https://www.voidtools.com/support/everything/sdk/everything_setsort/
-;    数量限量
-;    https://www.voidtools.com/support/everything/sdk/everything_setmax/
-
-;结果类型(获取个数，文件名，还是文件路径等)
-;https://www.voidtools.com/support/everything/sdk/everything_setrequestflags/
-
-;Everything_GetNumResults 获取有效结果数
-;Everything_GetTotResults 获取全部结果数(无视everything_setmax筛选数，但是count:3这种方式会生效)
-;run('Everything.exe -connect 用户名:密码@192.168.1.188:21 -search "文件名"')
-
-;●●●●●●●●●●●●●●●●●●●●●●●●●●
-;NOTE 搜索
-;http://www.voidtools.com/support/everything/searching/
-
-;修饰符，多限制可以连续，比如只搜索桌面文件夹下的前3个文件(不含子文件夹) count:3 file:nosubfolders:"c:\Users\Administrator\Desktop"
-;empty: 空文件夹
-;dupe: *.xlsx 重复项
-;count:3 限制数量
-;NOTE 精确搜索 wfn:*.exe !c:\windows\ !\_gsdata_\ !\$RECYCLE.BIN\	排除目录，且搜文件名
-;folder:TC   仅搜索文件夹
-;指定文件夹：
-    ;parent: 父文件夹(感觉和nosubfolders一样)
-    ;nosubfolders:"c:\Users\Administrator\Desktop"
-    ;depth:递归层数 "d:\TC\soft\Vim\vimfiles\bundle\repos\github.com\" depth:9
-    ;parents: 未知
-;●●●●●●●●●●●●●●●●●●●●●●●●●●
-
-;空格	“与”的关系	aaa bbb
-;|	“或”的关系	aaa|bbb
-;!	排除该关键字	aaa !eee
-;*	多个字符
-;?	一个字符
-;abc\	指定部分路径
-;*.exe	搜索特定格式文件
-
-;解决方案：
-;file:\dir\a.exe会匹配到\dir\a.exe.back
-;file:*\dir\a.exe即可
-;明确为exe:\dir\a.exe
-;_ET.smartWin("PowerShell.exe", "ConsoleWindowClass")
-;_ET.smartWin("Console.exe", "Console_2_Main", map("br",(p*)=>"-t powershell"))
-
-;F4通过软件的【浏览路径】设置为gvim编辑文件
-;结果筛选见【搜索】→管理筛选器 Ctrl-Shift-f
-;ctrl-i 大小写
-;ctrl-u 路径
-;ctrl-r 正则
-;ctrl-b 全字
-*/
-
-vimd_Everything.init()
+﻿vimd_Everything.init()
 class vimd_Everything extends _ET {
 
     static init() {
@@ -84,7 +21,7 @@ class vimd_Everything extends _ET {
         this.mode1.mapkey("<super>{F5}1",(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
 
         ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
-        this.mode1.mapkey("r",(p*)=>run(vimd_Everything.currentFilePath()),"run")
+        this.mode1.mapkey("<super>{F3}",(p*)=>run(vimd_Everything.currentFilePath()),"run")
         this.mode1.mapkey("<super>{F4}",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"run")
         this.mode1.mapkey("<super>{F12}{F12}",(p*)=>vimd_Everything.openOption(),"打开配置")
         this.mode1.mapkey("<super>{F12}k",(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
