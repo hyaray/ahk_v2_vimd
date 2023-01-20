@@ -5,6 +5,8 @@ class vimd_Everything extends _ET {
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
         this.mode1 := this.win.initMode(1,, true)
         this.win.setKeySuperVim()
+        this.mode1.objTips.set(
+        )
 
         ;hotkey("F4", (p*)=>_ET.smartDo())
 
@@ -12,21 +14,29 @@ class vimd_Everything extends _ET {
 
         this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
         this.mode1.mapkey("b",(p*)=>vimd_Everything.compare(),"比较")
-        this.mode1.mapkey("<super>{F5}{F5}",(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
-        this.mode1.mapkey("<super>{F5}f",(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
-        this.mode1.mapkey("<super>{F5}d",(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
-        this.mode1.mapkey("<super>{F5}e",(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
-        this.mode1.mapkey("<super>{F5}i",(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
-        this.mode1.mapkey("<super>{F5}r",(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
-        this.mode1.mapkey("<super>{F5}1",(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
+
+        mapF5("{F5}")
+        mapF5(k0) {
+            this.mode1.mapkey(format("{1}{1}",k0),(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
+            this.mode1.mapkey(format("{1}f",k0),(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
+            this.mode1.mapkey(format("{1}d",k0),(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
+            this.mode1.mapkey(format("{1}e",k0),(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
+            this.mode1.mapkey(format("{1}i",k0),(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
+            this.mode1.mapkey(format("{1}r",k0),(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
+            this.mode1.mapkey(format("{1}1",k0),(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
+        }
 
         ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
         this.mode1.mapkey("<super>{F3}",(p*)=>run(vimd_Everything.currentFilePath()),"run")
         this.mode1.mapkey("<super>{F4}",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"run")
-        this.mode1.mapkey("<super>{F12}{F12}",(p*)=>vimd_Everything.openOption(),"打开配置")
-        this.mode1.mapkey("<super>{F12}k",(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
-        this.mode1.mapkey("<super>{F12}i",(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
-        this.mode1.mapkey("<super>{F12}u",ObjBindMethod(vimd_Everything,"update"),"更新")
+
+        mapF12("{F12}")
+        mapF12(k0){
+            this.mode1.mapkey(format("{1}{1}",k0),(p*)=>vimd_Everything.openOption(),"打开配置")
+            this.mode1.mapkey(format("{1}k",k0),(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
+            this.mode1.mapkey(format("{1}i",k0),(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
+            this.mode1.mapkey(format("{1}u",k0),ObjBindMethod(vimd_Everything,"update"),"更新")
+        }
     }
 
     static update() {
@@ -118,7 +128,7 @@ class _ET {
 
     static spath := "d:\TC\soft\Everything\Everything.exe"
     static dll := format("d:\BB\plugins\vimd\wins\Everything\Everything{1}.dll", A_PtrSize*8)
-    static exclude:= "!c:\windows\ !c:\windows.old\ !c:\Users\ !\$RECYCLE.BIN\ !\.SynologyWorkingDirectory !\_FreeFileSync_\ !d:\hy\" ;!\_gsdata_\
+    static exclude:= "!c:\windows\ !c:\windows.old\ !\$RECYCLE.BIN\ !\.SynologyWorkingDirectory !\_FreeFileSync_\ !d:\hy\" ;!\_gsdata_\ !c:\Users\
     ;static res := map()
 
     ;fpOrFn用来运行程序
@@ -140,10 +150,10 @@ class _ET {
             winTitle := "ahk_exe " . exeName
         else
             winTitle := funcHwndOrwinClass . " ahk_exe " . exeName
-        ;获取 noExt
-        noExt := exeName.noExt64()
-        if (noExt ~= "^\d") ;数字开头不能当函数名
-            noExt := "_" . noExt
+        ;获取 fnn
+        fnn := exeName.noExt64()
+        if (fnn ~= "^\d") ;数字开头不能当函数名
+            fnn := "_" . fnn
         ;处理逻辑
         ;OutputDebug(format("i#{1} {2}:ProcessExist(exeName)={3}", A_LineFile,A_LineNumber,ProcessExist(exeName)))
         if (!ProcessExist(exeName)) {
@@ -255,9 +265,8 @@ class _ET {
                 return [filename] ;系统应用比如mspaint.exe，res未加载，直接返回mspaint.exe
             arr := []
             loop(n) {
-                res := buffer(256)
-                dllcall(this.dll . "\Everything_GetResultFullPathName", "int",A_Index-1, "ptr",res, "int",128)
-                arr.push(strget(res))
+                res := _ET.GetResultFullPathName(A_Index-1)
+                arr.push(res)
             }
             ;dllcall("FreeLibrary", "Ptr", hModule)
             return arr
@@ -275,8 +284,10 @@ class _ET {
         if (filename ~= "\.exe$") ;TODO 不搜c:\windows的exe
             exclude := this.exclude
         else
-            exclude := StrReplace(this.exclude, "!c:\windows\", "!c:\") ;不搜C:\的文档资料
+            exclude := this.exclude
+            ;exclude := StrReplace(this.exclude, "!c:\windows\", "!c:\") ;不搜C:\的文档资料
         fps := this.search(filename, exclude)
+        OutputDebug(format("i#{1} {2}:fps={3}", A_LineFile,A_LineNumber,json.stringify(fps,4)))
         n := fps.length
         if (n) { ;有找到
             if (n >= 1) {
@@ -362,13 +373,19 @@ class _ET {
                 return [] ;系统应用比如mspaint.exe，fp未加载，直接返回mspaint.exe
             arr := []
             loop(n) {
-                VarSetStrCapacity(&fp, 256)
-                dllcall(this.dll . "\Everything_GetResultFullPathName", "int",A_Index-1, "str",fp, "int",128) ;TODO 128太短了，文件名不全
+                fp := _ET.GetResultFullPathName(A_Index-1)
                 arr.push(fp)
             }
-            ;dllcall("FreeLibrary", "Ptr", hModule)
+            ;dllcall("FreeLibrary", "Ptr",hModule)
             return arr
         }
+    }
+
+    ;第i个结果
+    static GetResultFullPathName(i:=0, nLen:=256) {
+        VarSetStrCapacity(&fp, nLen*2)
+        dllcall(this.dll . "\Everything_GetResultFullPathName", "int",i, "str",fp, "int",nLen)
+        return fp
     }
 
     ;搜索扩展名最新文件
@@ -409,7 +426,7 @@ class _ET {
             WinActivate(idA)
         } else if (sSearch != "") {
             if (sSearch.isabs() || (sSearch ~= "^\\\\"))
-                run(format('{1} -search "{2}"', _ET.spath,sSearch.noExt()))
+                run(format('{1} -search "{2}"', _ET.spath,sSearch.fnn()))
             else
                 run(format('{1} -search "{2}"', _ET.spath,sSearch))
         } else
@@ -478,8 +495,7 @@ class _ET {
             loop(dllcall(this.dll . "\Everything_GetTotResults")) {
                 i := A_Index - 1
                 fn := strget(dllcall(this.dll . "\Everything_GetResultFileName", "int",i)) ;res用fn(如QQ.exe)当Key
-                VarSetStrCapacity(&fp, 256)
-                dllcall(this.dll . "\Everything_GetResultFullPathName", "int",i, "str",fp, "int",128)
+                fp := _ET.GetResultFullPathName(i)
                 if (res.has(fn)) {
                     continue ;只获取第一个结果 TODO
                     ;if !isobject(res[fn]) ;有多个结果

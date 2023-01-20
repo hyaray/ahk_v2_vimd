@@ -60,7 +60,7 @@ class vimd {
 
     static hideTips() {
         ;OutputDebug(format("i#{1} {2}:hideTips", A_LineFile,A_LineNumber))
-        btt(,,, vimd.tipLevel)
+        tooltip(,,, vimd.tipLevel)
     }
 
     static hideTips1() => tooltip(,,, vimd.tipLevel1)
@@ -237,6 +237,8 @@ class vimd {
         SplitPath(A_LineFile,, &dir)
         fp := format("{1}\vimdInclude.ahk",dir)
         str := fileread(fp)
+        arr := StrSplit(rtrim(fileread(fp),"`r`n"), "`n", "`r").map(v=>StrSplit(v,"\")[2])
+        ;objInclude := StrSplit(rtrim(fileread(fp),"`r`n"), "`n", "`r").map(v=>)
         loop files, dir . "\wins\*", "D" {
             if (A_LoopFileAttrib ~= "[HS]")
                 continue
@@ -501,7 +503,7 @@ class vimd {
         ;NOTE 执行命令或中途退出才执行
         ;tp -1=执行前半段 0=全部执行 1=执行后半段
         init(tp:=0) {
-            ;OutputDebug(format("i#{1} {2}:init tp={3}", A_LineFile,A_LineNumber,tp))
+            ;OutputDebug(format("i#{1} {2}:init tp={3} start", A_LineFile,A_LineNumber,tp))
             if (tp <= 0) { ;用于在do之前先初始化一部分
                 this.arrKeymapPressed := [] ;记录每个按键
                 this.tipsDynamic := ""
@@ -565,7 +567,10 @@ class vimd {
                 if (this.HasOwnProp("objFunDynamic") && this.objFunDynamic.has(keyMap)) {
                     OutputDebug(format("i#{1} {2}:{3}.objFunDynamic({4})", A_LineFile,A_LineNumber,this.name,keyMap))
                     this.arrListDynamic := [] ;NOTE 每次都要清空
-                    this.objFunDynamic[keyMap].call()
+                    if (this.objFunDynamic[keyMap].call()) { ;;TODO 特意有返回值的，表示已执行完动作，直接结束 <2023-01-20 22:25:39> hyaray
+                        this.init()
+                        exit
+                    }
                     OutputDebug(format("i#{1} {2}:{3}.arrListDynamic.length == {4}", A_LineFile,A_LineNumber,this.name,this.arrListDynamic.length))
                 } else {
                     ;OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
@@ -605,7 +610,7 @@ class vimd {
         ;更新当前匹配的命令并 showTips
         ;先修改arrKeymapPressed再运行
         update(keyMap) {
-            OutputDebug(format("{1} keyMap={2}", A_ThisFunc,keyMap))
+            ;OutputDebug(format("i#{1} {2}:{3} keyMap={4}", A_LineFile,A_LineNumber,A_ThisFunc,keyMap))
             if (keyMap == "{BackSpace}") {
                 this.arrKeymapPressed.pop()
                 OutputDebug(format("new arrKeymapPressed = {1}", json.stringify(this.arrKeymapPressed)))
@@ -619,25 +624,21 @@ class vimd {
             } else {
                 this.arrKeymapPressed.push(keyMap)
             }
-            arrMatch := [] ;记录所有匹配热键(不分动态和普通)
-            this.strCache := this.getStrCache()
-            OutputDebug(format("i#{1} {2}:this.strCache={3}", A_LineFile,A_LineNumber,this.strCache))
-            ;匹配动态命令
-            ;   命令列表是在第1个键动态生成，后续按键需要动态更新
-            for objDo in this.arrListDynamic {
-                if (instr(objDo["string"],this.strCache,true) == 1)
-                    arrMatch.push(objDo)
-            }
-            OutputDebug(format("i#{1} {2}:after check doListDynamic, arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
-            ;匹配普通命令
-            arrTitle := this.win.getArrWinMatch(this.thisHotIfWin, true) ;NOTE NOTE NOTE 获取当前热键可能匹配的 arrTitle
-            for winTitle in arrTitle
-                arrThis := addByWinTitle(winTitle)
-            OutputDebug(format("i#{1} {2}:last arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
+            arrMatch := getMatchAction()
             if (!arrMatch.length) { ;没找到命令
                 if (this.arrKeymapPressed.length == 1) { ;为第1个按键
                     send(this.arrKeymapPressed[1])
                     this.init()
+                } else if (keyMap ~= "^[1-9]$") { ;TODO 中间按了不存在的数字键，当序号使用 <2023-01-20 23:34:18> hyaray
+                    this.arrKeymapPressed.pop()
+                    ;重新获取匹配命令
+                    i := integer(keyMap)
+                    arrMatch := getMatchAction()
+                    if (i <= arrMatch.length) {
+                        this.init(-1)
+                        this.do(arrMatch[i]["action"], this.win.GetCount(), arrMatch[i]["comment"])
+                        this.init(1)
+                    }
                 } else { ;TODO 按错了，是否忽略
                     this.arrKeymapPressed.pop()
                 }
@@ -649,17 +650,35 @@ class vimd {
             } else { ;大部分情况
                 this.showTips(arrMatch)
             }
-            addByWinTitle(winTitle) {
-                arrThis := []
-                if (this.objHotIfWin_FirstKey[winTitle].has(this.arrKeymapPressed[1])) {
-                    for objDo in this.objHotIfWin_FirstKey[winTitle][this.arrKeymapPressed[1]] {
-                        if (instr(objDo["string"],this.strCache,true) == 1) { ;NOTE 匹配大小写
-                            arrMatch.push(objDo)
-                            arrThis.push(objDo["string"])
+            getMatchAction() {
+                arrMatch := [] ;记录所有匹配热键(不分动态和普通)
+                this.strCache := this.getStrCache()
+                OutputDebug(format("i#{1} {2}:this.strCache={3}", A_LineFile,A_LineNumber,this.strCache))
+                ;匹配动态命令
+                ;   命令列表是在第1个键动态生成，后续按键需要动态更新
+                for objDo in this.arrListDynamic {
+                    if (instr(objDo["string"],this.strCache,true) == 1)
+                        arrMatch.push(objDo)
+                }
+                OutputDebug(format("i#{1} {2}:after check doListDynamic, arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
+                ;匹配普通命令
+                arrTitle := this.win.getArrWinMatch(this.thisHotIfWin, true) ;NOTE NOTE NOTE 获取当前热键可能匹配的 arrTitle
+                for winTitle in arrTitle
+                    arrThis := addByWinTitle(winTitle)
+                OutputDebug(format("i#{1} {2}:last arrMatch.length={3}", A_LineFile,A_LineNumber,arrMatch.length))
+                return arrMatch
+                addByWinTitle(winTitle) {
+                    arrThis := []
+                    if (this.objHotIfWin_FirstKey[winTitle].has(this.arrKeymapPressed[1])) {
+                        for objDo in this.objHotIfWin_FirstKey[winTitle][this.arrKeymapPressed[1]] {
+                            if (instr(objDo["string"],this.strCache,true) == 1) { ;NOTE 匹配大小写
+                                arrMatch.push(objDo)
+                                arrThis.push(objDo["string"])
+                            }
                         }
                     }
+                    return arrThis
                 }
-                return arrThis
             }
         }
 
@@ -1030,14 +1049,14 @@ class vimd {
                 CoordMode("ToolTip", "window") ;强制为 window 模式
                 arrXY := this.win.funTipsCoordinate.call()
                 ;OutputDebug(format("i#{1} {2}:arrXY={3}", A_LineFile,A_LineNumber,json.stringify(arrXY)))
-                btt(str, arrXY[1], arrXY[2], vimd.tipLevel)
-                ;OutputDebug(format("i#{1} {2}:after btt", A_LineFile,A_LineNumber))
+                tooltip(str, arrXY[1], arrXY[2], vimd.tipLevel)
+                ;OutputDebug(format("i#{1} {2}:after tooltip", A_LineFile,A_LineNumber))
                 CoordMode("ToolTip", cmToolTip)
             } else {
                 MouseGetPos(&x, &y)
                 x += 40
                 y += 40
-                btt(str, x, y, vimd.tipLevel)
+                tooltip(str, x, y, vimd.tipLevel)
             }
         }
 
