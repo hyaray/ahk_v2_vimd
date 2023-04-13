@@ -4,13 +4,10 @@ class vimd_Everything extends _ET {
     static init() {
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
         this.mode1 := this.win.initMode(1,, true)
-        this.win.setKeySuperVim()
         this.mode1.objTips.set(
         )
 
         ;hotkey("F4", (p*)=>_ET.smartDo())
-
-        this.mode1.setObjHotWin("ahk_class EVERYTHING")
 
         this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
         this.mode1.mapkey("b",(p*)=>vimd_Everything.compare(),"比较")
@@ -128,16 +125,16 @@ class _ET {
 
     static spath := "d:\TC\soft\Everything\Everything.exe"
     static dll := format("d:\BB\plugins\vimd\wins\Everything\Everything{1}.dll", A_PtrSize*8)
-    static exclude:= "!c:\windows\ !c:\windows.old\ !\$RECYCLE.BIN\ !\.SynologyWorkingDirectory !\_FreeFileSync_\ !d:\hy\" ;!\_gsdata_\ !c:\Users\
+    static exclude:= "!c:\windows\ !c:\windows.old\ !\$RECYCLE.BIN\ !\.SynologyWorkingDirectory !\_FreeFileSync_\ !d:\hy\ !u:" ;!\_gsdata_\ !c:\Users\
     ;static res := map()
 
     ;fpOrFn用来运行程序
     ;funcHwndOrwinClass很多程序，还需要进一步筛选
-    ;   如果是 class(要带ahk_class)，则默认会过滤空标题
+    ;   如果是 ahk_class class，则默认会过滤空标题
     ;   如果还要考虑标题，必须要传入函数来判断
     ;objFunApi的键是br(beforeRun), ar(afterRun), ba(beforeActive), aa(afterActive), bh(beforeHide), ah(afterHide)
     ;有些窗口不需要记录窗口id
-    static smartWin(fpOrFn, funcHwndOrwinClass:="", objFunApi:="", allWin:=0) {
+    static smartWin(fpOrFn, funcHwndOrwinClass:=unset, objFunApi:="", allWin:=0) {
         ;获取 exeName
         if (instr(fpOrFn, ":"))
             SplitPath(fpOrFn, &exeName)
@@ -146,10 +143,17 @@ class _ET {
         if (exeName ~= "i)\.[vbe|cmd|bat]") ;NOTE cmd的需要转换
             exeName := substr(exeName,1,strlen(exeName)-4) . ".exe"
         ;获取 winTitle(用来遍历)
-        if (isobject(funcHwndOrwinClass) || (funcHwndOrwinClass == ""))
-            winTitle := "ahk_exe " . exeName
-        else
-            winTitle := funcHwndOrwinClass . " ahk_exe " . exeName
+        winTitle := "ahk_exe " . exeName
+        if (isset(funcHwndOrwinClass)) {
+            if (funcHwndOrwinClass is string) {
+                winTitle := format("{1} {2}", funcHwndOrwinClass,winTitle)
+                funcHwndOrwinClass := (*)=>1
+            }
+        }
+        ;if (isobject(funcHwndOrwinClass) || (funcHwndOrwinClass == ""))
+        ;    winTitle := "ahk_exe " . exeName
+        ;else
+        ;    winTitle := funcHwndOrwinClass . " ahk_exe " . exeName
         ;获取 fnn
         fnn := exeName.noExt64()
         if (fnn ~= "^\d") ;数字开头不能当函数名
@@ -449,7 +453,7 @@ class _ET {
             numput("UPtr", query.ptr, cds, A_PtrSize*2)
             SendMessage(0x4A, hwnd, &cds,, idEv)
             ;if errorlevel != FAIL
-            ;return 1
+            ;return true
         } else
             msgbox("Everything未打开")
         return 0
