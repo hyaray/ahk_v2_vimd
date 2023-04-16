@@ -275,8 +275,8 @@ class _ET {
             ;dllcall("FreeLibrary", "Ptr", hModule)
             return arr
         } else {
-            throw ValueError(format("搜索失败: {1}`nGetSearch: {2}`nGetLastError: {3}", sSearch,strget(dllcall(this.dll "\Everything_GetSearch")),dllcall(this.dll "\Everything_GetLastError")))
-            ;return []
+            ;throw ValueError(format("搜索失败: {1}`nGetSearch: {2}`nGetLastError: {3}", sSearch,strget(dllcall(this.dll "\Everything_GetSearch")),dllcall(this.dll "\Everything_GetLastError")))
+            return []
         }
     }
 
