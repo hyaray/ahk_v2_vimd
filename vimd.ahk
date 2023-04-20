@@ -34,9 +34,16 @@
 mapF11("{F11}")
 mapF11(k0) {
     this.mode1.setGroup(k0) ;额外增加这句
-    this.mode1.mapkey(format("<super>{1}{2}",k0,"a"),,"分组a", 1) ;分组，末尾参数用1
-    this.mode1.mapkey(format("<super>{1}{2}",k0,"axy"),msgbox.bind("axy"),"注释axy", 2) ;功能，末尾参数用2
-    this.mode1.mapkey(format("<super>{1}{2}",k0,"ayx"),msgbox.bind("ayx"),"注释ayx", 2)
+    ;推荐简化版
+    a := [
+        ["分组a","a"],
+        [
+            ["注释axy","xy"],
+            ["注释ayx","yx"],
+        ]
+    ]
+    this.mode1.mapGroup(format("<super>{1}",k0), a)
+    ;原始
     this.mode1.mapkey(format("<super>{1}{2}",k0,"b"),,"分组b", 1)
     this.mode1.mapkey(format("<super>{1}{2}",k0,"bxy"),msgbox.bind("bxy"),"注释bxy", 2)
     this.mode1.mapkey(format("<super>{1}{2}",k0,"bxz"),msgbox.bind("bxz"),"注释bxz", 2)
@@ -631,8 +638,10 @@ class vimd {
                     this.init()
                     return
                 } else if (this.objFKey[this.arrKeymapPressed[1]].has("group")) { 
-                    if (this.arrKeymapPressed.length == 1) ;分组会提示 按0执行全部功能
+                    if (this.arrKeymapPressed.length == 1) { ;分组会提示 按0执行全部功能
+                        vimd.groupGlobal := 0 ;NOTE 切换回普通状态
                         this.addTipsDynamic()
+                    }
                 }
             } else if (keyMap == "{escape}") {
                 this.init()
@@ -827,8 +836,9 @@ class vimd {
                 this.mapkey(string(A_Index-1),"",format("<{1}>", A_Index-1))
         }
 
+        ;显性为分组做准备，否则每次 mapkey 都要判断是否已完成
         setGroup(k0, val:=true) {
-            if this.objFKey.has(k0)
+            if (this.objFKey.has(k0))
                 this.objFKey[k0]["group"] := val
             else
                 this.objFKey[k0] := map("group", val)
@@ -840,6 +850,41 @@ class vimd {
         }
         mapDynamic(keysmap, funcObj:=unset, comment:=unset, groupLevel:=0) {
             objDo := this._map(keysmap, funcObj?, "*" . comment, groupLevel, "dynamic") ;动态功能，前面加 *
+        }
+        ;arr2 格式
+        ; [
+        ;   [groupName, groupHot], ;第1项为分组
+        ;   [
+        ;       [item1Name, item1Hot],
+        ;       [item2Name, item2Hot],
+        ;   ]
+        ;]
+        mapGroup(hotBefore, arr2) {
+            groupName := format("【{1}】", arr2[1][1])
+            if (arr2[2].length == 1) { ;只有1项子元素，则直接显示到分组上
+                switch arr2[2][1].length {
+                    case 1, 2:
+                        groupName .= "--" . arr2[2][1][1]
+                    default:
+                        groupName .= "--" . arr2[2][1][3]
+                }
+            }
+            this.mapDynamic(hotBefore . arr2[1][2],, groupName, 1)
+            for arrTmp in arr2[2] {
+                hot := hotBefore . arr2[1][2]
+                switch arrTmp.length {
+                    case 1:
+                        name := arrTmp[1]
+                        hot .= string(A_Index) ;默认序号
+                    case 2:
+                        name := arrTmp[1]
+                        hot .= arrTmp[2]
+                    default:
+                        name := arrTmp[3]
+                        hot .= (arrTmp[2]=="") ? string(A_Index) : arrTmp[2]
+                }
+                this.mapDynamic(hot, ((x)=>_U9Web().searchPage(x)).bind(arrTmp[1]), name, 2)
+            }
         }
         ;把定义打包为 objDo
         ;如果 funcObj 在 keyIn 里明确了逻辑，则这里随便定义都行，比如 mapCount
