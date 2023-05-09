@@ -326,8 +326,8 @@ class vimd {
             this.onBeforeHideTip := ""
             ;搭配 keySuperVim 使用
             this.keySuperVim := ""
-            this.keyToMode0 := "``" ;如果设置为空，则永远是vim模式，比如在gvim里
-            this.keyToMode1 := "{escape}" ;如果设置为空，则永远是mode0模式，只用<super>键功能
+            this.keyToMode0 := "``" ;如果设置为空，则无法切换至 mode0
+            this.keyToMode1 := "{escape}" ;如果设置为空，则无法切换至 mode1，只用<super>键功能执行 mode1 命令
             this.keyDebug := "{F10}" ;用得较少 {F12}一般用在配置文件
             this.typeSuperVim := 0 ;1=只切换 2=切换并执行按键
             this.objKeySuperVim := map() ;记录超级按键，比 keySuperVim 多了个生效当前按键功能
@@ -336,7 +336,6 @@ class vimd {
         ;初始化内置的模式(mode0|mode1)
         ;此方法由各插件调用(生成+map一并进行)
         ;默认的模式放最后定义，或者最后加上 win.changeMode(i)
-        ;NOTE 必须先 initMode(0) 再 initMode(1)
         ;NOTE 必须先 setHotIf
         ;binMap(二进制理解) 0=none 1=count 2=repeat 3=both
         initMode(idx, binMap:=3, funOnBeforeKey:=false, modename:="") {
@@ -512,6 +511,8 @@ class vimd {
         init(tp:=0) {
             ;OutputDebug(format("i#{1} {2}:init tp={3} start", A_LineFile,A_LineNumber,tp))
             if (tp <= 0) { ;用于在do之前先初始化一部分
+                if (this.arrKeymapPressed.length && this.objFKey.has(this.arrKeymapPressed[1]) && this.objFKey[this.arrKeymapPressed[1]].has("group"))
+                    this.objFKey[this.arrKeymapPressed[1]].delete("group")
                 this.arrKeymapPressed := [] ;记录每个按键
                 this.arrDynamicTips := []
                 vimd.groupGlobal := 0
@@ -579,8 +580,8 @@ class vimd {
                         exit
                     }
                 }
-                if (this.win.typeSuperVim == 2) ;<super>键显示保存的模式名
-                    this.addTipsDynamic(this.win.modeBeforeSuper.name)
+                ;if (this.win.typeSuperVim == 2) ;<super>键显示保存的模式名
+                ;    this.addTipsDynamic(this.win.modeBeforeSuper.name)
                 ;自动运行 objFunDynamic()
                 if (this.HasOwnProp("objFunDynamic") && this.objFunDynamic.has(keyMap)) {
                     if (vimd.debugLevel > 0)
@@ -591,6 +592,7 @@ class vimd {
                         this.init()
                         exit
                     }
+                    ;OutputDebug(format("i#{1} {2}:{3} dynamic={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(this.objFKey[keyMap]["dynamic"],4)))
                 } else {
                     if (vimd.debugLevel > 0)
                         OutputDebug(format("i#{1} {2}:{3} 键没有动态", A_LineFile,A_LineNumber,keyMap))
@@ -638,7 +640,7 @@ class vimd {
                     this.init()
                     return
                 } else if (this.objFKey[this.arrKeymapPressed[1]].has("group")) { 
-                    if (this.arrKeymapPressed.length == 1) { ;分组会提示 按0执行全部功能
+                    if (this.arrKeymapPressed.length == 1) { ;分组会提示
                         vimd.groupGlobal := 0 ;NOTE 切换回普通状态
                         this.addTipsDynamic()
                     }
@@ -649,8 +651,6 @@ class vimd {
             } else {
                 this.setArrKeymapPressed(keyMap)
             }
-            if (vimd.debugLevel > 0)
-                OutputDebug(format("i#{1} {2}:{3} this.arrKeymapPressed={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(this.arrKeymapPressed,4)))
             ;NOTE 核心：获取匹配项
             arrMatch := getMatchAction()
             ;处理逻辑
@@ -685,6 +685,8 @@ class vimd {
             }
             ;所有匹配热键(dynamic+normal)
             getMatchAction() {
+                if (vimd.debugLevel > 0)
+                    OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
                 ;按键未定义功能
                 if (!this.objFKey.has(this.arrKeymapPressed[1])) {
                     if (vimd.debugLevel > 0)
@@ -700,22 +702,29 @@ class vimd {
                 ;NOTE group 情况
                 switch this.arrKeymapPressed.length {
                     case 1: ;首个按键，只显示分组功能
-                        ;arrMatch := _matchAction((objDo)=>(objDo["groupLevel"]==1))
                         arrMatch := _matchAction(1)
                         if (arrMatch.length == 1) { ;只有1组，则直接展开下级
                             if (vimd.debugLevel > 0)
                                 OutputDebug(format("i#{1} {2}:{3} only 1 group, groupGlobal", A_LineFile,A_LineNumber,A_ThisFunc))
-                            groupLoadGlobal()
-                            this.addTipsDynamic(format("按{1}执行全部功能", vimd.groupKeyAll))
+                            arrMatch := groupLoadGlobal(true)
                         }
                     case 2: ;第2按键
                         if (vimd.groupGlobal) { ;已经展开了全局
-                            groupLoadGlobal()
-                        } else {
-                            groupLoadAndCheck()
+                            arrMatch := groupLoadGlobal()
+                        } else { ;搜索分组
+                            arrMatch := _matchAction(2) 
+                            if (!arrMatch.length) { ;TODO 找不到分组，搜索全部分组下的节点
+                                if (vimd.debugLevel > 0)
+                                    OutputDebug(format("i#{1} {2}:{3} group not matched", A_LineFile,A_LineNumber,A_ThisFunc))
+                                arrMatch := groupLoadGlobal(true) ;分组下的节点仍搜不到，仍给上级处理
+                                ;if (!arrMatch.length)
+                                ;    this.setArrKeymapPressed()
+                            } else {
+                                this.addTipsDynamic(format("{1}`t按{2}执行全部功能", "",vimd.groupKeyAll))
+                            }
                         }
                     default: ;3-n个按键
-                        if (vimd.groupGlobal) { ;直接全局搜子节点
+                        if (vimd.groupGlobal) { ;已经展开了全局
                             arrMatch := _matchAction(2, vimd.groupKeymap)
                         } else { ;仍然分组搜索
                             OutputDebug(format("i#{1} {2}:{3} group", A_LineFile,A_LineNumber,A_ThisFunc))
@@ -723,25 +732,26 @@ class vimd {
                             groupDoAll()
                         }
                 }
+                if (vimd.debugLevel > 0)
+                    OutputDebug(format("i#{1} {2}:{3} arrMatch={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(arrMatch,4)))
                 return arrMatch
-                groupLoadAndCheck() { ;加载分组，如果不存在，则加载所有子节点
-                    vimd.groupGlobal := 0
-                    arrMatch := _matchAction(2)
-                    if (!arrMatch.length) { ;TODO 找不到，搜索全部分组下的节点
-                        if (vimd.debugLevel > 0)
-                            OutputDebug(format("i#{1} {2}:{3} group not matched", A_LineFile,A_LineNumber,A_ThisFunc))
-                        groupLoadGlobal()
-                    } else {
-                        this.addTipsDynamic(format("按{1}执行全部功能", vimd.groupKeyAll))
-                    }
-                }
-                groupLoadGlobal() { ;跳过分组，直接加载全局命令
+                groupLoadGlobal(bAddTip:=false) { ;跳过分组，直接加载全局命令
+                    OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
                     vimd.groupGlobal := 1
                     arrMatch := _matchAction(2, vimd.groupKeymap)
-                    if (!arrMatch.length)
-                        groupDoAll()
+                    if (!arrMatch.length) { ; ;NOTE 子命令也不匹配，已经到了逻辑末尾，这里直接处理
+                        if (!groupDoAll()) {
+                            vimd.groupGlobal := 0
+                            this.setArrKeymapPressed()
+                            exit
+                        }
+                    }
+                    if (bAddTip)
+                        this.addTipsDynamic(format("{1}`t按{2}执行全部功能", "",vimd.groupKeyAll))
+                    return arrMatch
                 }
                 groupDoAll() { ;判断是否按键执行分组下所有命令
+                    OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
                     if (this.arrKeymapPressed[-1] == vimd.groupKeyAll) {
                         this.setArrKeymapPressed()
                         arrMatch := _matchAction(2)
@@ -749,29 +759,46 @@ class vimd {
                             this.do(objDo["action"], this.win.GetCount())
                         this.init()
                         exit
+                    } else {
+                        return false
                     }
                 }
                 ;NOTE 分组情况下，如果全局搜子节点，会删除分组的热键(场景：不知道在哪个全组，所以才全局搜索)
                 _matchAction(groupLevel:=0, key:="string") {
                     arrTmp := []
+                    objUnique := map()
+                    if (vimd.debugLevel > 0)
+                        OutputDebug(format("i#{1} {2}:{3} this.sKeymapPressed={4} key={5}", A_LineFile,A_LineNumber,A_ThisFunc,this.sKeymapPressed,key))
                     for tp in ["dynamic", "normal"] {
                         if (!this.objFKey[this.arrKeymapPressed[1]].has(tp))
                             continue
+                        if (vimd.debugLevel > 0)
+                            OutputDebug(format("i#{1} {2}:{3} tp={4} {5}", A_LineFile,A_LineNumber,A_ThisFunc,tp,json.stringify(this.objFKey[this.arrKeymapPressed[1]][tp],4)))
                         for objDo in this.objFKey[this.arrKeymapPressed[1]][tp] {
                             if (key == vimd.groupKeymap && !objDo.has(key))
                                 continue
                             if (instr(objDo[key],this.sKeymapPressed,true) == 1) { ;NOTE 匹配大小写
                                 if (groupLevel) {
-                                    if (objDo["groupLevel"] == groupLevel)
+                                    ;if (groupLevel == 2 && objDo["groupLevel"] == 1)
+                                        ;vimd.groupCurrent := objDo["commentClean"]
+                                        ;msgbox(json.stringify(objDo, 4))
+                                    if (objDo["groupLevel"] == groupLevel) {
+                                        if (groupLevel == 2) { ;NOTE 同命令可能在多个分组下有重复，以注释为依据去重
+                                            if (objUnique.has(objDo["comment"]))
+                                                continue
+                                            else
+                                                objUnique[objDo["comment"]] := 1
+                                        }
                                         arrTmp.push(objDo)
+                                    }
                                 } else {
                                     arrTmp.push(objDo)
                                 }
                             }
                         }
                     }
-                    ;if (vimd.debugLevel > 0)
-                    ;    OutputDebug(format("i#{1} {2}:{3} arrMatch={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(arrTmp,4)))
+                    if (vimd.debugLevel > 0)
+                        OutputDebug(format("i#{1} {2}:{3} arrMatch={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(arrTmp,4)))
                     return arrTmp
                 }
             }
@@ -796,6 +823,8 @@ class vimd {
         setArrKeymapPressed(k:="") {
             (k == "") ? this.arrKeymapPressed.pop() : this.arrKeymapPressed.push(k)
             this.sKeymapPressed := "".join(this.arrKeymapPressed) ;TODO 是否直接修改
+            if (vimd.debugLevel > 0)
+                OutputDebug(format("i#{1} {2}:{3} arrKeymapPressed={4}", A_LineFile,A_LineNumber,A_ThisFunc,json.stringify(this.arrKeymapPressed,4)))
             return this.arrKeymapPressed
         }
 
@@ -814,16 +843,15 @@ class vimd {
                 if (this.win.keyToMode0 != "")
                     this.mapkey(this.win.keyToMode0,ObjBindMethod(this.win,"changeMode",0),"进入 mode0")
                 ;NOTE 定义debug的内置功能，自带 <super> 参数
-                keymapDebug := format("<super>{1}", this.win.keyDebug)
-                this.mapkey(keymapDebug . keymapDebug,ObjBindMethod(this,"doGlobal_Edit"),"【编辑】vimd_" . this.win.name)
-                this.mapkey(keymapDebug . "d",ObjBindMethod(vimd,"setDebugLevel"),"显示/隐藏调试信息")
-                this.mapkey(keymapDebug . "{F9}",ObjBindMethod(this,"doGlobal_objFKey"),"查看所有功能(按首键分组)objFKey")
-                this.mapkey(keymapDebug . "]",ObjBindMethod(this,"doGlobal_objKeysmap"),"查看所有功能(按keymap分组)objKeysmap")
-                this.mapkey(keymapDebug . "-",ObjBindMethod(this,"doGlobal_Debug_objSingleKey"),"查看所有拦截的按键 objHotIfWin_SingleKey")
-                this.mapkey(keymapDebug . "|",ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
-                this.mapkey(keymapDebug . "\",ObjBindMethod(this,"doGlobal_Debug_objFunDynamic"),"查看所有的<super>键 objFunDynamic")
-                this.mapkey(keymapDebug . "/",ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
-                n := 0 ;二进制的位数(从右开始)
+                this.mapkey(format("<super>{1}{1}",this.win.keyDebug),ObjBindMethod(this,"doGlobal_Edit"),"【编辑】vimd_" . this.win.name)
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"d"),ObjBindMethod(vimd,"setDebugLevel"),"显示/隐藏调试信息")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"["),ObjBindMethod(this,"doGlobal_objFKey"),"查看所有功能(按首键分组)objFKey")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"]"),ObjBindMethod(this,"doGlobal_objKeysmap"),"查看所有功能(按keymap分组)objKeysmap")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"k"),ObjBindMethod(this,"doGlobal_Debug_objSingleKey"),"查看所有拦截的按键 objHotIfWin_SingleKey")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"|"),ObjBindMethod(this,"doGlobal_Debug_objKeySuperVim"),"查看所有的<super>键 objKeySuperVim")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"\"),ObjBindMethod(this,"doGlobal_Debug_objFunDynamic"),"查看所有的<super>键 objFunDynamic")
+                this.mapkey(format("<super>{1}{2}",this.win.keyDebug,"/"),ObjBindMethod(this,"doGlobal_Debug_arrHistory"),"查看运行历史 arrHistory")
+                n := 0 ;二进制的位数<super>(从右开始)
                 if ((binMap & 2**n) >> n) ;也可以用 "10" 这种字符串来判断
                     this.mapCount()
                 n++
@@ -837,11 +865,12 @@ class vimd {
         }
 
         ;显性为分组做准备，否则每次 mapkey 都要判断是否已完成
-        setGroup(k0, val:=true) {
+        ;只判断有无key，值没用
+        setGroup(k0) {
             if (this.objFKey.has(k0))
-                this.objFKey[k0]["group"] := val
+                this.objFKey[k0]["group"] := 0
             else
-                this.objFKey[k0] := map("group", val)
+                this.objFKey[k0] := map("group", 0)
         }
 
         ;keysmap类型 <^enter> {F1} + A
@@ -849,7 +878,7 @@ class vimd {
             objDo := this._map(keysmap, funcObj?, comment?, groupLevel, "normal")
         }
         mapDynamic(keysmap, funcObj:=unset, comment:=unset, groupLevel:=0) {
-            objDo := this._map(keysmap, funcObj?, "*" . comment, groupLevel, "dynamic") ;动态功能，前面加 *
+            objDo := this._map(keysmap, funcObj?, comment, groupLevel, "dynamic") ;TODO 动态功能，是否要标识
         }
         ;arr2 格式
         ; [
@@ -859,10 +888,11 @@ class vimd {
         ;       [item2Name, item2Hot],
         ;   ]
         ;]
-        mapGroup(hotBefore, arr2) {
-            groupName := format("【{1}】", arr2[1][1])
+        mapGroup(hotBefore, fun, arr2, sBefore:="") {
+            groupName := format("{1}【{2}】", sBefore,arr2[1][1])
             if (arr2[2].length == 1) { ;只有1项子元素，则直接显示到分组上
                 switch arr2[2][1].length {
+                    case 0: return
                     case 1, 2:
                         groupName .= "--" . arr2[2][1][1]
                     default:
@@ -883,7 +913,7 @@ class vimd {
                         name := arrTmp[3]
                         hot .= (arrTmp[2]=="") ? string(A_Index) : arrTmp[2]
                 }
-                this.mapDynamic(hot, ((x)=>_U9Web().searchPage(x)).bind(arrTmp[1]), name, 2)
+                this.mapDynamic(hot, fun.bind(arrTmp[1]), name, 2)
             }
         }
         ;把定义打包为 objDo
@@ -895,7 +925,12 @@ class vimd {
             if (isset(comment)) {
                 if (isset(funcObj))
                     objDo["action"] := funcObj
-                objDo["comment"] := comment
+                if (comment is array) {
+                    objDo["comment"] := comment[1] . comment[2]
+                    objDo["commentClean"] := comment[2] ;NOTE 仅分组定义
+                } else {
+                    objDo["commentClean"] := objDo["comment"] := comment
+                }
                 objDo["hotwin"] := this.win.currentHotIfWin
                 objDo["groupLevel"] := groupLevel
                 if (!this.objFKey.has(objDo["keyMapFirst"]))
@@ -939,6 +974,7 @@ class vimd {
         ;["hotwin"] := "" ;NOTE 记录按键当前的窗口，实际上因为按键冲突，没用
         ;["action"] := ""
         ;["comment"] := ""
+        ;["commentClean"] := "" ;NOTE 显示分组名称 by 火冷 <2023-04-24 08:52:21>
         ;["super"] := super ;热键永远 on(无视模式)，直接用 hotkey()定义即可
         key_map2arrHot(keysmap, groupLevel) {
             ;keysmap := RegExReplace(RegExReplace(RegExReplace(keysmap, "i)<super>", "", &super), "i)<noWait>", "", &noWait), "i)<noMulti>", "", &noMulti)
@@ -1106,13 +1142,13 @@ class vimd {
         }
         doGlobal_Edit() {
             SplitPath(A_LineFile,, &dn)
-            if (this.win.HasOwnProp("cls") && this.win.cls.HasOwnProp("getTitleEx")) {
-                title := this.win.cls.getTitleEx()
-                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name), title)
-                OutputDebug(format("i#{1} {2}:title={3}", A_LineFile,A_LineNumber,title))
+            if (this.win.HasOwnProp("funEditSearch")) { ;TODO 增加方法来传入定位信息
+                sSearch := this.win.funEditSearch()
+                OutputDebug(format("i#{1} {2}:title={3}", A_LineFile,A_LineNumber,sSearch))
+                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name), sSearch)
             } else {
-                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name))
                 OutputDebug(format("i#{1} {2}", A_LineFile,A_LineNumber))
+                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name))
             }
         }
         doGlobal_Repeat() {

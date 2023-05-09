@@ -3,11 +3,15 @@ class vimd_Everything extends _ET {
 
     static init() {
         this.win := vimd.initWin("Everything", "ahk_exe Everything.exe")
+        this.win.keyToMode1 := ""
+
         this.mode1 := this.win.initMode(1,, true)
         this.mode1.objTips.set(
         )
 
-        ;hotkey("F4", (p*)=>_ET.smartDo())
+        this.mode1.setDynamics([
+            "F1",
+        ], this)
 
         this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
         this.mode1.mapkey("b",(p*)=>vimd_Everything.compare(),"比较")
@@ -33,6 +37,20 @@ class vimd_Everything extends _ET {
             this.mode1.mapkey(format("{1}k",k0),(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
             this.mode1.mapkey(format("{1}i",k0),(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
             this.mode1.mapkey(format("{1}u",k0),ObjBindMethod(vimd_Everything,"update"),"更新")
+        }
+
+        this.win.setMode(0)
+    }
+
+    static dynamicF1(k0) {
+        oET := _ET()
+        for k, arr in oET.objAll {
+            s := format("<super>{1}",k0,arr[1])
+            OutputDebug(format("i#{1} {2}:{3} s={4}", A_LineFile,A_LineNumber,A_ThisFunc,s))
+            if (oET.objConfig.has(k))
+                this.mode1.mapDynamic(format("<super>{1}{2}",k0,arr[1]), ObjBindMethod(oET, "deleteConfig", k), "删除-" . arr[2])
+            else
+                this.mode1.mapDynamic(format("<super>{1}{2}",k0,arr[1]), ObjBindMethod(oET, "addConfig", k), "添加-" . k)
         }
     }
 
@@ -208,7 +226,7 @@ class _ET {
             OutputDebug(format("i#{1} {2}:fp={3}", A_LineFile,A_LineNumber,fp))
             ;打开程序
             try
-                run(fp, dir)
+                run(format('{1} /c {2}', A_ComSpec,fp),, "hide") ;run(fp, dir) ;TODO 尝试 <2023-04-22 23:31:11> hyaray
             catch
                 throw ValueError(fp)
             ;打开后自动运行
@@ -465,24 +483,6 @@ class _ET {
             return SendMessage(0x400, a,,, idEv)
     }
 
-    static searchMode() { ;[Everything 区分大小写]
-        obj := map(
-            "大小写","case,",
-            "正则","RegEx,",
-            "文件名","wfn,",
-	    )
-        SendMessage(0x147, 0, 0, "Edit1", "A")
-        str_EvEdit1 := ControlGetText("Edit1", "A")
-        if (instr(str_EvEdit1, "case:")) {
-            str_EvEdit1 := StrReplace(str_EvEdit1, "case:")
-            ControlSetText(str_EvEdit1, "Edit1", "A")
-        } else {
-            ControlSetText("case:" . str_EvEdit1, "Edit1", "A")
-        }
-        send("{end}")
-        return
-    }
-
     ;获取所有exe、ahk、lnk数据，依赖dll
     ;多个结果，只获取第一个 TODO
     static build() {
@@ -512,6 +512,38 @@ class _ET {
         try
             dllcall("FreeLibrary", "Ptr", hModule)
         return res
+    }
+
+    __new() {
+        this.text := ControlGetText("Edit1","A")
+        this.arrConfig := StrSplit(this.text, ":")
+        this.objConfig := this.arrConfig.toMapAsKey()
+        this.objAll := map(
+            "case", ["c", "匹配大小写"],
+            "RegEx", ["r", "正则"],
+            "wfn", ["f", "文件名完整匹配"],
+	    )
+    }
+
+    searchMode() { ;[Everything 区分大小写]
+        if (instr(str_EvEdit1, "case:")) {
+            str_EvEdit1 := StrReplace(str_EvEdit1, "case:")
+            ControlSetText(str_EvEdit1, "Edit1", "A")
+        } else {
+            ControlSetText("case:" . str_EvEdit1, "Edit1", "A")
+        }
+        send("{end}")
+        return
+    }
+
+    addConfig(name) {
+        this.text := format("{1}:{2}", name,this.text)
+        ControlSetText(this.text, "Edit1", "A")
+    }
+
+    deleteConfig(name) {
+        this.text := StrReplace(this.text, name . ":")
+        ControlSetText(this.text, "Edit1", "A")
     }
 
 }
