@@ -18,13 +18,13 @@ class vimd_Everything extends _ET {
 
         mapF5("{F5}")
         mapF5(k0) {
-            this.mode1.mapkey(format("{1}{1}",k0),(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
-            this.mode1.mapkey(format("{1}f",k0),(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
-            this.mode1.mapkey(format("{1}d",k0),(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
-            this.mode1.mapkey(format("{1}e",k0),(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
-            this.mode1.mapkey(format("{1}i",k0),(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
-            this.mode1.mapkey(format("{1}r",k0),(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
-            this.mode1.mapkey(format("{1}1",k0),(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
+            this.mode1.mapkey(format("<super>{1}{1}",k0),(p*)=>ControlChooseString("所有", "ComboBox1"),"显示-所有")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"f"),(p*)=>ControlChooseString("文件", "ComboBox1"),"显示-文件")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"d"),(p*)=>ControlChooseString("文件夹", "ComboBox1"),"显示-文件夹")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"e"),(p*)=>ControlChooseString("排除列表", "ComboBox1"),"显示-排除列表")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"i"),(p*)=>send("{ctrl down}i{ctrl up}"),"大小写切换")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"r"),(p*)=>send("{ctrl down}r{ctrl up}"),"正则切换")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"1"),(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
         }
 
         ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
@@ -33,10 +33,10 @@ class vimd_Everything extends _ET {
 
         mapF12("{F12}")
         mapF12(k0){
-            this.mode1.mapkey(format("{1}{1}",k0),(p*)=>vimd_Everything.openOption(),"打开配置")
-            this.mode1.mapkey(format("{1}k",k0),(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
-            this.mode1.mapkey(format("{1}i",k0),(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
-            this.mode1.mapkey(format("{1}u",k0),ObjBindMethod(vimd_Everything,"update"),"更新")
+            this.mode1.mapkey(format("<super>{1}{1}",k0),(p*)=>vimd_Everything.openOption(),"打开配置")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"k"),(p*)=>vimd_Everything.openOption("常规\快捷键"),"配置-快捷键")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"i"),(p*)=>vimd_Everything.openOption("索引\排除列表"),"配置-排除列表")
+            this.mode1.mapkey(format("<super>{1}{2}",k0,"u"),ObjBindMethod(vimd_Everything,"update"),"更新")
         }
 
         this.win.setMode(0)
@@ -173,7 +173,7 @@ class _ET {
         ;else
         ;    winTitle := funcHwndOrwinClass . " ahk_exe " . exeName
         ;获取 fnn
-        fnn := exeName.noExt64()
+        fnn := exeName.fnn64()
         if (fnn ~= "^\d") ;数字开头不能当函数名
             fnn := "_" . fnn
         ;处理逻辑
@@ -226,7 +226,7 @@ class _ET {
             OutputDebug(format("i#{1} {2}:fp={3}", A_LineFile,A_LineNumber,fp))
             ;打开程序
             try
-                run(format('{1} /c {2}', A_ComSpec,fp),, "hide") ;run(fp, dir) ;TODO 尝试 <2023-04-22 23:31:11> hyaray
+                run(format('{1} /c {2}', A_ComSpec,fp), dir, "hide") ;run(fp, dir) ;TODO 尝试 <2023-04-22 23:31:11> hyaray
             catch
                 throw ValueError(fp)
             ;打开后自动运行

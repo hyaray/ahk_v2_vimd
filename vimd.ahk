@@ -55,12 +55,12 @@ mapF11(k0) {
 class vimd {
     static arrModeName := ["None","Vim"]
     ;static charSplit := "※" ;分隔各命令
-    static winCurrent := "" ;记录当前的窗口，用来出错后 init
+    static winCurrent := 0 ;记录当前的窗口，用来出错后 init
     static tipLevel := 15
     static tipLevel1 := 16 ;其他辅助显示
     static debugLevel := 0 ;用于方便地显示提示信息
     static groupKeymap := "groupString" ;分组的全局搜索时，objDo 的字段定义在 groupKeymap
-    static groupGlobal := 0
+    static groupStatus := false
     static groupKeyAll := "{F12}" ;NOTE 执行当前全部命令
 
     static __new() {
@@ -98,8 +98,9 @@ class vimd {
         }
     }
 
+    ;vimdModes.showTips
     static hideTips() {
-        ;OutputDebug(format("i#{1} {2}:hideTips", A_LineFile,A_LineNumber))
+        OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
         tooltip(,,, vimd.tipLevel)
     }
 
@@ -515,7 +516,7 @@ class vimd {
                     this.objFKey[this.arrKeymapPressed[1]].delete("group")
                 this.arrKeymapPressed := [] ;记录每个按键
                 this.arrDynamicTips := []
-                vimd.groupGlobal := 0
+                vimd.groupStatus := false
                 if (this.win.typeSuperVim)
                     this.win.exitSuperMode()
                 vimd.hideTips1()
@@ -641,7 +642,7 @@ class vimd {
                     return
                 } else if (this.objFKey[this.arrKeymapPressed[1]].has("group")) { 
                     if (this.arrKeymapPressed.length == 1) { ;分组会提示
-                        vimd.groupGlobal := 0 ;NOTE 切换回普通状态
+                        vimd.groupStatus := false ;NOTE 切换回普通状态
                         this.addTipsDynamic()
                     }
                 }
@@ -705,11 +706,11 @@ class vimd {
                         arrMatch := _matchAction(1)
                         if (arrMatch.length == 1) { ;只有1组，则直接展开下级
                             if (vimd.debugLevel > 0)
-                                OutputDebug(format("i#{1} {2}:{3} only 1 group, groupGlobal", A_LineFile,A_LineNumber,A_ThisFunc))
+                                OutputDebug(format("i#{1} {2}:{3} only 1 group, groupStatus", A_LineFile,A_LineNumber,A_ThisFunc))
                             arrMatch := groupLoadGlobal(true)
                         }
                     case 2: ;第2按键
-                        if (vimd.groupGlobal) { ;已经展开了全局
+                        if (vimd.groupStatus) { ;已经展开了全局
                             arrMatch := groupLoadGlobal()
                         } else { ;搜索分组
                             arrMatch := _matchAction(2) 
@@ -724,7 +725,7 @@ class vimd {
                             }
                         }
                     default: ;3-n个按键
-                        if (vimd.groupGlobal) { ;已经展开了全局
+                        if (vimd.groupStatus) { ;已经展开了全局
                             arrMatch := _matchAction(2, vimd.groupKeymap)
                         } else { ;仍然分组搜索
                             OutputDebug(format("i#{1} {2}:{3} group", A_LineFile,A_LineNumber,A_ThisFunc))
@@ -737,11 +738,11 @@ class vimd {
                 return arrMatch
                 groupLoadGlobal(bAddTip:=false) { ;跳过分组，直接加载全局命令
                     OutputDebug(format("i#{1} {2}:{3}", A_LineFile,A_LineNumber,A_ThisFunc))
-                    vimd.groupGlobal := 1
+                    vimd.groupStatus := true
                     arrMatch := _matchAction(2, vimd.groupKeymap)
                     if (!arrMatch.length) { ; ;NOTE 子命令也不匹配，已经到了逻辑末尾，这里直接处理
                         if (!groupDoAll()) {
-                            vimd.groupGlobal := 0
+                            vimd.groupStatus := false
                             this.setArrKeymapPressed()
                             exit
                         }
@@ -755,9 +756,10 @@ class vimd {
                     if (this.arrKeymapPressed[-1] == vimd.groupKeyAll) {
                         this.setArrKeymapPressed()
                         arrMatch := _matchAction(2)
+                        this.init(-1)
                         for objDo in arrMatch
                             this.do(objDo["action"], this.win.GetCount())
-                        this.init()
+                        this.init(1)
                         exit
                     } else {
                         return false
@@ -971,6 +973,7 @@ class vimd {
         ;["arrkey"] := []
         ;["keyMapFirst"] := [] ;第1个按键
         ;["string"] := "" ;按键字符串
+        ;[groupKeymap] := "" ;分组按键字符串
         ;["hotwin"] := "" ;NOTE 记录按键当前的窗口，实际上因为按键冲突，没用
         ;["action"] := ""
         ;["comment"] := ""
@@ -1005,7 +1008,7 @@ class vimd {
                     if (A_Index == 1)
                         objDo["keyMapFirst"] := thisKey
                 }
-                ;添加 groupString
+                ;添加 vimd.groupKeymap
                 if (groupLevel > 1 && A_Index != 2)
                     objDo[vimd.groupKeymap] .= vimd.key_hot2map(thisKey)
                 ;二次处理
@@ -1184,15 +1187,12 @@ class vimd {
             } else {
                 getStr(this.objFKey[key], key)
             }
-            hyf_GuiListView(arr2, ["标题","类型","首键","所有键","描述","其他"])
+            hyf_GuiListView(arr2, ["标题","模式","首键","所有键","描述","其他"])
             getStr(obj, k0:="") {
                 for tp in ["dynamic", "normal"] {
                     if (!obj.has(tp))
                         continue
                     for objDo in obj[tp] {
-                        ;if (k0 == "")
-                        ;    res .= format("{1}`t{2}`t{3}`t{4}`n", objDo["hotwin"],keysmap,objDo["string"],objDo["comment"])
-                        ;else
                         arr2.push([objDo["hotwin"],tp,k0,objDo["string"],objDo["comment"]])
                         if (objDo["groupLevel"])
                             arr2[-1].push(objDo.get(vimd.groupKeymap, "group"))
@@ -1251,9 +1251,9 @@ class vimd {
             for s in this.arrDynamicTips
                 strTooltip .= "`t" . s ;NOTE 添加动态信息
             strTooltip .= "`n=====================`n"
-            key := vimd.groupGlobal ? vimd.groupKeymap : "string"
+            key := vimd.groupStatus ? vimd.groupKeymap : "string"
             for objDo in arrMatch
-                strTooltip .= format("{1}`t{2}`n", objDo[key],objDo["comment"])
+                strTooltip .= format("{1}`t{2}`n", RegExReplace(objDo[key],"\s|\{space\}","☐"),objDo["comment"]) ;NOTE 空格需要转换
             this._show(strTooltip)
         }
 
@@ -1270,8 +1270,8 @@ class vimd {
                 CoordMode("ToolTip", cmToolTip)
             } else {
                 MouseGetPos(&x, &y)
-                x += 40
-                y += 40
+                x += 20*A_ScreenDPI//96 ;NOTE 防止鼠标挡住
+                y += 20*A_ScreenDPI//96
                 tooltip(str, x, y, vimd.tipLevel)
             }
         }
