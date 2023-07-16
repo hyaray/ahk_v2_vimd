@@ -29,6 +29,8 @@
 ;   再按第2个键，如果类似菜单文件夹，则显示对应文件夹下的命令
 ;       NOTE 同时支持按下0时，如果没有匹配到命令，则执行当前显示的所有命令(批量执行分组的所有功能)
 ;       如果非分组热键，则全局搜索由 groupKeymap 定义的子节点热键
+;NOTE 运行中如果某个键的功能无效，其他功能可以，可能是那个功能有问题，一直没执行完
+
 ;定义示例
 /*
 mapF11("{F11}")
@@ -449,6 +451,8 @@ class vimd {
         ;byScript 非手工按键，而是用脚本触发时，需要传入此参数，如 vimd_WeChat.win.keyIn("F3", "ahk_exe WeChat.exe")
         keyIn(ThisHotkey, byScript:=0) {
             keyMap := vimd.key_hot2map(ThisHotkey)
+
+
             ;OutputDebug(format("i#{1} {2}:A_ThisFunc={3}-------------------start", A_LineFile,A_LineNumber,A_ThisFunc))
             ;OutputDebug(format("currentMode.index={1}", this.currentMode.index))
             ;OutputDebug(format("arrKeymapPressed.length = {1}", this.currentMode.arrKeymapPressed.length))
@@ -877,10 +881,10 @@ class vimd {
 
         ;keysmap类型 <^enter> {F1} + A
         mapkey(keysmap, funcObj:=unset, comment:=unset, groupLevel:=0) {
-            objDo := this._map(keysmap, funcObj?, comment?, groupLevel, "normal")
+            this._map(keysmap, funcObj?, comment?, groupLevel, "normal")
         }
         mapDynamic(keysmap, funcObj:=unset, comment:=unset, groupLevel:=0) {
-            objDo := this._map(keysmap, funcObj?, comment, groupLevel, "dynamic") ;TODO 动态功能，是否要标识
+            this._map(keysmap, funcObj?, "***" . comment, groupLevel, "dynamic") ;TODO 动态功能，是否要标识
         }
         ;arr2 格式
         ; [
@@ -1148,10 +1152,10 @@ class vimd {
             if (this.win.HasOwnProp("funEditSearch")) { ;TODO 增加方法来传入定位信息
                 sSearch := this.win.funEditSearch()
                 OutputDebug(format("i#{1} {2}:title={3}", A_LineFile,A_LineNumber,sSearch))
-                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name), sSearch)
+                _c.e(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name), sSearch)
             } else {
                 OutputDebug(format("i#{1} {2}", A_LineFile,A_LineNumber))
-                hyf_runByVim(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name))
+                _c.e(format("{1}\wins\{2}\vimd_{2}.ahk",dn,this.win.name))
             }
         }
         doGlobal_Repeat() {

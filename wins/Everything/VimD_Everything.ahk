@@ -13,7 +13,7 @@ class vimd_Everything extends _ET {
             "F1",
         ], this)
 
-        this.mode1.mapkey("\l",(p*)=>hyf_runByVim(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
+        this.mode1.mapkey("\l",(p*)=>_c.e(A_ScriptDir . "\lib\Everything.ahk"),"编辑lib\Everything.ahk")
         this.mode1.mapkey("b",(p*)=>vimd_Everything.compare(),"比较")
 
         mapF5("{F5}")
@@ -27,9 +27,9 @@ class vimd_Everything extends _ET {
             this.mode1.mapkey(format("<super>{1}{2}",k0,"1"),(p*)=>vimd_Everything.toggleIgnore(),"切换-启用排除列表(不推荐)")
         }
 
-        ;this.mode1.mapkey("e",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"vim打开")
+        ;this.mode1.mapkey("e",(p*)=>_c.e(vimd_Everything.currentFilePath()),"vim打开")
         this.mode1.mapkey("<super>{F3}",(p*)=>run(vimd_Everything.currentFilePath()),"run")
-        this.mode1.mapkey("<super>{F4}",(p*)=>hyf_runByVim(vimd_Everything.currentFilePath()),"run")
+        this.mode1.mapkey("<super>{F4}",(p*)=>_c.e(vimd_Everything.currentFilePath()),"run")
 
         mapF12("{F12}")
         mapF12(k0){
@@ -326,27 +326,9 @@ class _ET {
             loop parse, p, "`;" {
                 fp := format("{1}\{2}", A_LoopField,filename)
                 if (instr(fp, "%"))
-                    fp := var2Str(fp)
+                    fp := fp.var2Str()
                 if (FileExist(fp))
                     return fp
-            }
-        }
-        var2Str(str) { ;把%var%(只匹配\w的字符串)转换成变量的值
-            reg := "(.*?)%([a-zA-Z_]\w+)%(.*)"
-            startPos := 1
-            loop { ;有变量
-                p := RegExMatch(str, reg, &m, startPos)
-                if (p) {
-                    varPath := EnvGet(m[2])
-                    if (varPath != "") {
-                        startPos := m.pos(2)+ strlen(varPath) - 1
-                        str := format("{1}{2}{3}{4}", substr(str,1,p-1),m[1],varPath,m[3])
-                    } else { ;没有变量(一般没用)
-                        startPos := m.pos(2)+ strlen(m[2]) + 1
-                        str := format("{1}{2}%{3}%{4}", substr(str,1,p-1),m[1],m[2],m[3])
-                    }
-                } else
-                    return str
             }
         }
     }
